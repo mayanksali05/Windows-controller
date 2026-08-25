@@ -1,6 +1,7 @@
 using WinLock.Protocol.Models;
 using WinLock.Service.Configuration;
 using WinLock.Service.Locking;
+using WinLock.Service.Security;
 
 namespace WinLock.Service.Status;
 
@@ -13,12 +14,14 @@ public interface ISystemStatusService
 public sealed class WindowsSystemStatusService : ISystemStatusService
 {
     private readonly IWindowsLockService _lockService;
+    private readonly AuthorizedDeviceStore _devices;
     private readonly string _version;
     private readonly string _environment;
 
-    public WindowsSystemStatusService(IWindowsLockService lockService, ServerOptions serverOptions)
+    public WindowsSystemStatusService(IWindowsLockService lockService, AuthorizedDeviceStore devices, ServerOptions serverOptions)
     {
         _lockService = lockService;
+        _devices = devices;
         _version = typeof(WindowsSystemStatusService).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
         _environment = string.Equals(serverOptions.Environment, "Development", StringComparison.OrdinalIgnoreCase)
             ? "Development"
@@ -33,6 +36,6 @@ public sealed class WindowsSystemStatusService : ISystemStatusService
         Environment = _environment,
         LockAvailable = _lockService.CanLock,
         Proximity = "UNKNOWN",
-        Security = "NOT_PAIRED",
+        Security = _devices.Count > 0 ? "PAIRED" : "NOT_PAIRED",
     };
 }

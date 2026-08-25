@@ -105,5 +105,70 @@ public sealed class ServiceClient : IDisposable
         }
     }
 
+    /// <summary>Creates a pairing session and returns the full QR payload (authenticated).</summary>
+    public async Task<PairingSessionPayloadDto?> CreatePairingSessionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/pair/session");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PairingSessionPayloadDto>>(cancellationToken);
+            return body?.Data;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Lists paired devices (authenticated).</summary>
+    public async Task<IReadOnlyList<AuthorizedDeviceDto>> ListDevicesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/pair/devices");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Array.Empty<AuthorizedDeviceDto>();
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<AuthorizedDeviceDto>>>(cancellationToken);
+            return (IReadOnlyList<AuthorizedDeviceDto>?)body?.Data ?? Array.Empty<AuthorizedDeviceDto>();
+        }
+        catch (Exception)
+        {
+            return Array.Empty<AuthorizedDeviceDto>();
+        }
+    }
+
+    /// <summary>Removes a paired device (authenticated).</summary>
+    public async Task<(bool Success, string Message)> UnpairAsync(string deviceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/unpair")
+            {
+                Content = JsonContent.Create(new UnpairRequestDto { DeviceId = deviceId }),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadFromJsonAsync<ApiResponse>(cancellationToken);
+            return (response.IsSuccessStatusCode,
+                body?.Message ?? body?.Error?.Message ?? response.StatusCode.ToString());
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+    }
+
     public void Dispose() => _http.Dispose();
 }

@@ -81,13 +81,15 @@ See `docs/protocol.md`. Summary:
 | Method | Route            | Auth |
 |--------|------------------|------|
 | GET    | `/api/v1/status` | session |
-| POST   | `/api/v1/pair/request` | one-time token |
+| POST   | `/api/v1/pair/request` | anonymous (public identity) |
+| POST   | `/api/v1/pair/session` | session |
 | POST   | `/api/v1/pair/confirm` | one-time token + sig |
+| GET    | `/api/v1/pair/devices` | session |
+| POST   | `/api/v1/unpair` | session |
 | POST   | `/api/v1/auth/challenge` | — |
 | POST   | `/api/v1/auth/verify` | sig |
 | POST   | `/api/v1/lock` | session |
 | GET    | `/api/v1/proximity` | session |
-| POST   | `/api/v1/unpair` | session |
 
 ## 10. BLE Requirements
 
@@ -139,7 +141,7 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 
 1. ✅ Repository + architecture
 2. ✅ Windows service + authenticated API + lock
-3. ⬜ Secure pairing
+3. ✅ Secure pairing
 4. ⬜ Challenge-response authentication
 5. ⬜ iPhone application
 6. ⬜ BLE proximity

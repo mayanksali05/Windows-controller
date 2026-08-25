@@ -10,6 +10,8 @@ using WinLock.Service.Certificates;
 using WinLock.Service.Configuration;
 using WinLock.Service.Logging;
 using WinLock.Service.Locking;
+using WinLock.Service.Pairing;
+using WinLock.Service.Security;
 using WinLock.Service.Status;
 
 namespace WinLock.Service;
@@ -51,6 +53,23 @@ public partial class Program
         builder.Services.AddSingleton<IWindowsLockService, WindowsLockService>();
         builder.Services.AddSingleton<LockCoordinator>();
         builder.Services.AddSingleton<ISystemStatusService, WindowsSystemStatusService>();
+
+        builder.Services.AddSingleton<ISigningService, Ed25519SigningService>();
+        builder.Services.AddSingleton<ISecureStorage>(_ =>
+        {
+            var configured = builder.Configuration["Storage:Directory"];
+            var directory = string.IsNullOrWhiteSpace(configured)
+                ? Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "WinLock", "storage")
+                : configured;
+            return new DpapiSecureStorage(directory);
+        });
+        builder.Services.AddSingleton<DeviceIdentityService>();
+        builder.Services.AddSingleton<AuthorizedDeviceStore>();
+        builder.Services.AddSingleton(_ => new PairingSessionService(
+            TimeSpan.FromSeconds(builder.Configuration.GetValue<int>(
+                "Security:PairingTokenLifetimeSeconds", 300))));
 
         builder.Services.AddControllers(options =>
         {

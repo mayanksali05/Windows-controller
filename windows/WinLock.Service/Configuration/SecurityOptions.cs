@@ -9,4 +9,5 @@ public sealed class SecurityOptions
     public int ChallengeLifetimeSeconds { get; set; } = 30;
     public int MaxClockSkewSeconds { get; set; } = 60;
     public int SessionLifetimeMinutes { get; set; } = 10;
+    public int PairingTokenLifetimeSeconds { get; set; } = 300;
 }

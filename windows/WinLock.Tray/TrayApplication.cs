@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using WinLock.Protocol.Models;
 
 namespace WinLock.Tray;
 
@@ -22,6 +24,9 @@ public sealed class TrayApplication : IDisposable
 
         var menu = new ContextMenuStrip();
         menu.Items.Add(_statusItem);
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Pair new device", null, async (_, _) => await PairNewDeviceAsync());
+        menu.Items.Add("Paired devices", null, async (_, _) => await ShowDevicesAsync());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Lock now", null, async (_, _) => await LockNowAsync());
         menu.Items.Add("Open security logs", null, (_, _) => OpenLogs());
@@ -81,6 +86,28 @@ public sealed class TrayApplication : IDisposable
         var (ok, message) = await _client.LockAsync(_cts.Token);
         _notifyIcon.ShowBalloonTip(
             3000, "WinLock", ok ? "Laptop locked" : $"Lock failed: {message}", ToolTipIcon.Info);
+        await PollAsync();
+    }
+
+    private async Task PairNewDeviceAsync()
+    {
+        var payload = await _client.CreatePairingSessionAsync(_cts.Token);
+        if (payload is null)
+        {
+            _notifyIcon.ShowBalloonTip(3000, "WinLock", "Could not create a pairing session", ToolTipIcon.Warning);
+            return;
+        }
+
+        var payloadText = JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var dialog = new PairingDialog(payloadText, QrCodeRenderer.Render(payloadText));
+        dialog.ShowDialog();
+    }
+
+    private async Task ShowDevicesAsync()
+    {
+        var devices = await _client.ListDevicesAsync(_cts.Token);
+        using var dialog = new DevicesDialog(devices, deviceId => _client.UnpairAsync(deviceId, _cts.Token).ContinueWith(t => t.Result.Success));
+        dialog.ShowDialog();
         await PollAsync();
     }
 

@@ -72,19 +72,22 @@ A SwiftUI app (iOS 17+) that provides:
 | Method | Route            | Auth required | Purpose                              |
 |--------|------------------|---------------|--------------------------------------|
 | GET    | `/status`        | Yes           | Laptop status, battery, proximity     |
-| POST   | `/pair/request`  | No*           | Begin pairing, return challenge       |
-| POST   | `/pair/confirm`  | No*           | Confirm pairing with signed challenge |
+| POST   | `/pair/request`  | No*           | Verify server identity (public info) |
+| POST   | `/pair/session`  | Yes           | Create pairing session, QR payload    |
+| POST   | `/pair/confirm`  | No*           | Confirm pairing with one-time token + signed challenge |
+| GET    | `/pair/devices`  | Yes           | List paired devices                   |
+| POST   | `/unpair`        | Yes           | Remove a paired device                |
 | POST   | `/auth/challenge`| No*           | Request an auth challenge             |
 | POST   | `/auth/verify`   | Yes (fresh)   | Verify signed challenge, issue session|
 | POST   | `/lock`          | Yes           | Lock workstation                     |
 | GET    | `/proximity`     | Yes           | Current proximity state               |
-| POST    | `/unpair`        | Yes           | Remove a paired device                |
-| GET     | `/dev/token`     | Dev only*     | Runtime dev bearer token (Phase 2)    |
+| GET    | `/dev/token`     | Dev only*     | Runtime dev bearer token (Phase 2)    |
 
-`*` Pairing/auth endpoints are unauthenticated by design (no key yet) but are
-bound to single-use nonces and one-time pairing tokens generated locally by the
-Windows service (never a fixed password). The dev token endpoint is a Phase 2
-temporary mechanism, reachable only in Development, replaced by Phase 4.
+`*` Pairing/auth endpoints are unauthenticated by design (no key yet). The
+one-time pairing token is **never** exposed to unauthenticated clients — it is
+only shown on the Windows screen as a QR code. The dev token endpoint is a
+Phase 2 temporary mechanism, reachable only in Development, replaced by
+Phase 4.
 
 ## 4. Authentication
 
@@ -107,19 +110,22 @@ expiry, and a bounded nonce cache. See `protocol.md`.
 ## 5. Pairing
 
 1. Windows service generates a device identity key pair on first run (DPAPI-
-   protected).
-2. Service displays a QR code / pairing code containing its device ID and public
-   key plus a one-time pairing nonce.
-3. iPhone generates its own key pair, scans the QR.
+   protected); the device ID is derived from the public key.
+2. The tray application creates a pairing session and shows a QR code
+   containing the Windows device ID, public key, one-time nonce, one-time
+   pairing token, and a signature over the nonce.
+3. iPhone generates its own key pair, scans the QR, verifies the Windows
+   signature, and stores the Windows public key in Keychain.
 4. iPhone sends its device ID, public key, and a signature over the pairing
-   challenge (proving possession of its private key) to `/pair/confirm`.
-5. Service stores the iPhone public key; iPhone stores the Windows public key in
-   Keychain and pins the TLS certificate public key.
+   nonce (proving possession of its private key) to `/pair/confirm`.
+5. Windows verifies the token (single-use), the signature, stores the iPhone
+   public key (DPAPI), and marks the device authorized.
 6. Both sides mark the pairing complete; future requests require the signed
    challenge flow above.
 
 Trust is established by physical possession of the QR scan, not by network
-position. See `protocol.md` for the message format.
+position. The one-time pairing token never travels over the network. See
+`protocol.md` for the message format.
 
 ## 6. BLE Proximity
 
