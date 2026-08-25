@@ -145,15 +145,24 @@ establishes trust, and BLE (Phase 6) is proximity-only.
 
 ## 6. BLE Proximity
 
-- The iPhone advertises a custom BLE service with an encrypted-random-per-session
-  characteristic. The Windows service scans for advertisements from paired
-  devices and estimates proximity from RSSI and presence.
+- The iPhone advertises a **per-device BLE service UUID** derived from its
+  device id with RFC 4122 v5 (`ProximityUuid`, mirrored on both sides), plus a
+  characteristic that returns the device id. The Windows service
+  (`Bluetooth/WindowsBluetoothProximityScanner`) scans with the supported WinRT
+  `BluetoothLEAdvertisementWatcher` and maps matching service UUIDs back to
+  paired devices, estimating proximity from RSSI and presence.
 - **BLE presence is a proximity signal only. It is never sufficient for
   privileged operations.** Privileged operations always require cryptographic
   authentication + Face ID.
-- Proximity states: `UNKNOWN`, `NEARBY`, `AWAY`, `AUTHENTICATED`.
-- Automatic lock uses a configurable grace period so a single lost scan does not
-  lock the machine. See `windows/WinLock.Service` proximity controller.
+- Proximity states reported by the server: `UNKNOWN`, `NEARBY`, `AWAY`. The
+  combined `AUTHENTICATED` state is derived client-side (nearby + a valid
+  authenticated session).
+- A configurable away timeout (`Security:ProximityAwayTimeoutSeconds`) absorbs
+  temporary signal loss so a single dropped scan never locks the machine.
+- `ProximityMonitor` (hosted service) keeps the scanner in sync with the
+  paired-device store, exposes state for `/status`, `/proximity`, and the
+  `auth/verify` response, and emits `PROXIMITY_CHANGED` events. When Bluetooth
+  is unavailable, state is `UNKNOWN` (fail-safe).
 
 ## 7. Security Boundaries
 

@@ -7,6 +7,10 @@
 - Nothing on the network is trusted by position (IP/MAC/Wi-Fi presence).
   Trust is established by cryptographic proof of key possession.
 - BLE presence is a proximity signal only, never an authentication factor.
+  The per-device service UUID (RFC 4122 v5 of the device id) lets the Windows
+  scanner identify *which* phone is present, but the signal grants nothing:
+  privileged operations always require Face ID + the signed challenge-response
+  over Wi-Fi.
 - The system never handles, transmits, or stores Windows credentials.
 - No mechanism bypasses, disables, or circumvents Windows authentication.
 

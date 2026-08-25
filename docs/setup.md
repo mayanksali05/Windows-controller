@@ -2,7 +2,11 @@
 
 ## Prerequisites
 
-- **Windows 10/11** (64-bit) for the companion service.
+- **Windows 10/11** (64-bit, build 19041+) for the companion service (BLE
+  proximity uses the WinRT Bluetooth LE advertisement API).
+- Bluetooth 4.0+ hardware on the Windows machine, with Bluetooth enabled, for
+  proximity detection. If Bluetooth is unavailable, proximity stays `UNKNOWN`
+  and the service still functions (no BLE = no proximity/auto-lock).
 - **.NET SDK 8.0** or later.
 - **Xcode 15+ / iOS 17+ SDK** on macOS for the iPhone app (cannot build on
   Windows).

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WinLock.Protocol.Models;
 using WinLock.Service;
+using WinLock.Service.Bluetooth;
 using WinLock.Service.Locking;
 using Xunit;
 
@@ -20,9 +21,29 @@ public sealed class FakeLockService : IWindowsLockService
     public Task LockAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+public sealed class FakeProximityScanner : IBluetoothProximityScanner
+{
+    public ProximitySnapshot Current { get; private set; } = ProximitySnapshot.Unknown();
+    public event EventHandler<ProximitySnapshot>? SnapshotChanged;
+
+    public void SetMonitoredDevices(IReadOnlyCollection<string> deviceIds) { }
+
+    public void UpdateStale() { }
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public void SetState(ProximitySnapshot snapshot)
+    {
+        Current = snapshot;
+        SnapshotChanged?.Invoke(this, snapshot);
+    }
+}
+
 /// <summary>
 /// Hosts the real WinLock service over an in-memory test server with the lock
-/// service replaced by a fake (so tests never lock the workstation).
+/// service and BLE scanner replaced by fakes (so tests never lock the
+/// workstation or start a real Bluetooth watcher).
 /// </summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
@@ -41,6 +62,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.AddSingleton<IWindowsLockService, FakeLockService>();
+            services.AddSingleton<IBluetoothProximityScanner, FakeProximityScanner>();
         });
     }
 }
@@ -119,5 +141,37 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
         var response = await _client.PostAsync("/api/v1/lock", content);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unauthenticated_Proximity_Returns401()
+    {
+        var response = await _client.GetAsync("/api/v1/proximity");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ValidToken_Proximity_ReturnsStructuredState()
+    {
+        SetBearer(await AuthenticateLaptopAsync());
+        var response = await _client.GetAsync("/api/v1/proximity");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<ProximityDto>>();
+
+        Assert.NotNull(body);
+        Assert.True(body!.Success);
+        Assert.Equal("UNKNOWN", body.Data!.State);
+    }
+
+    [Fact]
+    public async Task Status_IncludesProximityState()
+    {
+        SetBearer(await AuthenticateLaptopAsync());
+        var response = await _client.GetAsync("/api/v1/status");
+        response.EnsureSuccessStatusCode();
+
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<StatusDto>>();
+        Assert.Equal("UNKNOWN", body!.Data!.Proximity);
     }
 }

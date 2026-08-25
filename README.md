@@ -95,9 +95,15 @@ See `docs/protocol.md`. Summary:
 
 ## 10. BLE Requirements
 
-- iPhone advertises a custom BLE service; Windows scans for paired devices.
-- Proximity states: `UNKNOWN`, `NEARBY`, `AWAY`, `AUTHENTICATED`.
-- Proximity is **not** authentication.
+- The iPhone advertises a per-device BLE service UUID (RFC 4122 v5 of its
+  device id); the Windows service scans for paired devices via the WinRT
+  Bluetooth LE advertisement API.
+- Proximity states: `UNKNOWN`, `NEARBY`, `AWAY` (`AUTHENTICATED` is derived
+  client-side from nearby + an authenticated session).
+- Proximity is **not** authentication — privileged operations always require
+  Face ID + signed challenge-response.
+- Requires Windows 10 build 19041+ with Bluetooth; if unavailable, proximity is
+  `UNKNOWN`.
 
 ## 11. Testing
 
@@ -147,6 +153,6 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 3. ✅ Secure pairing
 4. ✅ Challenge-response authentication
 5. ✅ iPhone application (SwiftUI — builds on macOS/Xcode)
-6. ⬜ BLE proximity
+6. ✅ BLE proximity
 7. ⬜ Automatic lock
 8. ⬜ Windows unlock research / extension point

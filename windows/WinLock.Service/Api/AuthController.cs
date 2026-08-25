@@ -5,6 +5,7 @@ using WinLock.Cryptography;
 using WinLock.Protocol;
 using WinLock.Protocol.Models;
 using WinLock.Service.Authentication;
+using WinLock.Service.Bluetooth;
 using WinLock.Service.Configuration;
 using WinLock.Service.Logging;
 using WinLock.Service.Security;
@@ -27,19 +28,22 @@ public sealed class AuthController : ControllerBase
     private readonly DeviceAuthorizer _devices;
     private readonly SecurityOptions _security;
     private readonly ISecurityEventLogger _log;
+    private readonly ProximityMonitor _proximity;
 
     public AuthController(
         ChallengeStore challenges,
         SessionTokenService sessions,
         DeviceAuthorizer devices,
         SecurityOptions security,
-        ISecurityEventLogger log)
+        ISecurityEventLogger log,
+        ProximityMonitor proximity)
     {
         _challenges = challenges;
         _sessions = sessions;
         _devices = devices;
         _security = security;
         _log = log;
+        _proximity = proximity;
     }
 
     [HttpPost("auth/challenge")]
@@ -132,7 +136,7 @@ public sealed class AuthController : ControllerBase
         {
             SessionToken = session.Token,
             SessionExpires = session.ExpiresAtUtc.ToString("O"),
-            Proximity = "UNKNOWN",
+            Proximity = _proximity.CurrentState.State.ToString().ToUpperInvariant(),
         }));
     }
 }

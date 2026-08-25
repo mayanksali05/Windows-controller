@@ -216,8 +216,26 @@ returns a structured error (e.g. `LOCK_FAILED`).
 ### GET /proximity
 
 ```json
-{ "success": true, "proximity": "AWAY" }
+{ "success": true, "data": { "state": "NEARBY", "device_id": "<phone>", "rssi": -55, "updated_at": "<ISO8601>" } }
 ```
+
+## 6. BLE Proximity
+
+- The iPhone advertises a **per-device BLE service UUID** derived with RFC 4122
+  v5 from its device id (`ProximityUuid`), plus a characteristic that returns
+  the device id when read. The Windows service derives the same UUID for each
+  paired device and scans with the WinRT `BluetoothLEAdvertisementWatcher`.
+- Presence of a matching service UUID + RSSI drives the state:
+  `UNKNOWN` (no scan / Bluetooth off), `NEARBY` (RSSI ≥ threshold), `AWAY`
+  (device not seen within the away timeout).
+- **BLE presence is a proximity signal only.** It is never sufficient for a
+  privileged operation, which always requires Face ID + the signed
+  challenge-response over Wi-Fi. The combined "AUTHENTICATED" state is derived
+  client-side (nearby + a valid authenticated session), not reported by the
+  server.
+- Temporary single-scan loss is absorbed by the configurable away timeout
+  (`Security:ProximityAwayTimeoutSeconds`); automatic locking (Phase 7) uses
+  this state.
 
 ### POST /unpair
 

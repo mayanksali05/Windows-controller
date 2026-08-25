@@ -14,5 +14,6 @@ struct ContentView: View {
             SecurityLogView(store: container.logStore)
                 .tabItem { Label("Logs", systemImage: "list.bullet.shield") }
         }
+        .task { container.updateAdvertising() }
     }
 }

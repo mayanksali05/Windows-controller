@@ -12,6 +12,8 @@ final class ServiceContainer: ObservableObject {
     let discovery: BonjourDiscovery
     let logStore: LogStore
 
+    private var _proximityAdvertiser: ProximityAdvertiser?
+
     init() {
         // Load or create the iPhone identity in the Keychain.
         let identity: DeviceKeys
@@ -57,5 +59,19 @@ final class ServiceContainer: ObservableObject {
             deviceId: deviceId,
             expectedPin: pin,
             mode: .development)
+    }
+
+    /// Starts/stops the BLE proximity advertisement depending on whether any
+    /// laptop is paired. BLE is a proximity signal only.
+    func updateAdvertising() {
+        if pairedLaptops.laptops.isEmpty {
+            _proximityAdvertiser?.stop()
+            _proximityAdvertiser = nil
+        } else {
+            if _proximityAdvertiser == nil {
+                _proximityAdvertiser = ProximityAdvertiser(deviceId: deviceId)
+            }
+            _proximityAdvertiser?.start()
+        }
     }
 }

@@ -97,5 +97,6 @@ final class PairingViewModel: ObservableObject {
         log.add(kind: "PAIRING_COMPLETED", "Paired with \(laptop.name)")
         pairedLaptop = laptop
         stage = .done
+        container.updateAdvertising()
     }
 }

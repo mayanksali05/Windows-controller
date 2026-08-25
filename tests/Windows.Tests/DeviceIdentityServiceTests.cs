@@ -31,7 +31,7 @@ public sealed class DeviceIdentityServiceTests : IDisposable
     public void Sign_VerifiesWithPublicKey()
     {
         var identity = new DeviceIdentityService(_storage, _signing);
-        var message = System.Text.Encoding.UTF8.GetBytes("hello\x1fworld\x1e");
+        var message = global::System.Text.Encoding.UTF8.GetBytes("hello\x1fworld\x1e");
 
         var signature = identity.Sign(message);
 

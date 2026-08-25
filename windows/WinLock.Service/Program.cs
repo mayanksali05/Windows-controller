@@ -7,6 +7,7 @@ using WinLock.Cryptography;
 using WinLock.Protocol;
 using WinLock.Protocol.Models;
 using WinLock.Service.Authentication;
+using WinLock.Service.Bluetooth;
 using WinLock.Service.Certificates;
 using WinLock.Service.Configuration;
 using WinLock.Service.Discovery;
@@ -80,6 +81,12 @@ public partial class Program
         builder.Services.AddSingleton<IWindowsLockService, WindowsLockService>();
         builder.Services.AddSingleton<LockCoordinator>();
         builder.Services.AddSingleton<ISystemStatusService, WindowsSystemStatusService>();
+
+        builder.Services.AddSingleton<IBluetoothProximityScanner>(_ => new WindowsBluetoothProximityScanner(
+            TimeSpan.FromSeconds(securityOptions.ProximityAwayTimeoutSeconds),
+            securityOptions.ProximityNearbyRssiThreshold));
+        builder.Services.AddSingleton<ProximityMonitor>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<ProximityMonitor>());
 
         builder.Services.AddSingleton(_ => new PairingSessionService(
             TimeSpan.FromSeconds(securityOptions.PairingTokenLifetimeSeconds)));
