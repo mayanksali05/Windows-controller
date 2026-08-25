@@ -19,3 +19,12 @@ struct AuthorizedDevice: Decodable, Identifiable {
 
     var id: String { deviceId }
 }
+
+/// Proximity/auto-lock policy from `GET /api/v1/settings`.
+struct AppSettings: Decodable {
+    let proximityEnabled: Bool
+    let proximityAwayTimeoutSeconds: Int
+    let proximityNearbyRssiThreshold: Int
+    let automaticLockEnabled: Bool
+    let autoLockAwayDurationSeconds: Int
+}

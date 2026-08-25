@@ -92,6 +92,7 @@ See `docs/protocol.md`. Summary:
 | POST   | `/api/v1/auth/verify` | single-use challenge + sig |
 | POST   | `/api/v1/lock` | session |
 | GET    | `/api/v1/proximity` | session |
+| GET    | `/api/v1/settings` | session |
 
 ## 10. BLE Requirements
 
@@ -104,6 +105,17 @@ See `docs/protocol.md`. Summary:
   Face ID + signed challenge-response.
 - Requires Windows 10 build 19041+ with Bluetooth; if unavailable, proximity is
   `UNKNOWN`.
+
+## 10.1 Automatic Locking
+
+- Optional: when enabled, the laptop locks after the paired phone's proximity
+  leaves `NEARBY` for a configurable duration (`Security:AutoLockAwayDurationSeconds`,
+  default 60s). Brief BLE losses are absorbed by the scanner away timeout, so a
+  single dropped scan never locks.
+- Locks at most once per absence; skipped if already locked or not in an
+  interactive session; only armed when a device is paired.
+- Configured on the Windows side (`GET /api/v1/settings` shows the policy to the
+  iPhone).
 
 ## 11. Testing
 
@@ -154,5 +166,5 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 4. ✅ Challenge-response authentication
 5. ✅ iPhone application (SwiftUI — builds on macOS/Xcode)
 6. ✅ BLE proximity
-7. ⬜ Automatic lock
+7. ✅ Automatic lock
 8. ⬜ Windows unlock research / extension point

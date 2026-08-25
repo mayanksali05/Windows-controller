@@ -37,6 +37,11 @@ final class APIClient {
         return try unwrap(response)
     }
 
+    func getSettings() async throws -> AppSettings {
+        let response: ApiResponse<AppSettings> = try await send("/api/v1/settings", method: "GET")
+        return try unwrap(response)
+    }
+
     func lock() async throws {
         let response: ApiResponse<EmptyData> = try await send(
             "/api/v1/lock", method: "POST", body: ["device_id": deviceId])

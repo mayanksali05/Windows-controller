@@ -86,6 +86,7 @@ A SwiftUI app (iOS 17+) that provides:
 | POST   | `/auth/verify`   | Yes (fresh)   | Verify signed challenge, issue session|
 | POST   | `/lock`          | Yes           | Lock workstation                     |
 | GET    | `/proximity`     | Yes           | Current proximity state               |
+| GET    | `/settings`      | Yes           | Read proximity/auto-lock policy       |
 
 `*` Pairing/auth endpoints are unauthenticated by design (no key yet). The
 one-time pairing token is **never** exposed to unauthenticated clients — it is
@@ -163,6 +164,20 @@ establishes trust, and BLE (Phase 6) is proximity-only.
   paired-device store, exposes state for `/status`, `/proximity`, and the
   `auth/verify` response, and emits `PROXIMITY_CHANGED` events. When Bluetooth
   is unavailable, state is `UNKNOWN` (fail-safe).
+
+### Automatic lock (Phase 7)
+
+`AutomaticLockMonitor` (hosted service) implements optional automatic locking:
+
+- When proximity leaves `NEARBY` (away or unknown), a timer starts. If the phone
+  returns within `Security:AutoLockAwayDurationSeconds` (default 60), the timer
+  is cancelled. If still absent when it fires, the workstation is locked via
+  `LockWorkStation`.
+- One lock per absence episode (no repeated lock attempts), skipped when the
+  workstation is already locked or the process is not in an interactive session.
+- It only arms when at least one device is paired, and only when
+  `Security:AutomaticLockEnabled` is true. Proximity is a convenience signal —
+  automatic lock never bypasses or weakens Windows authentication.
 
 ## 7. Security Boundaries
 

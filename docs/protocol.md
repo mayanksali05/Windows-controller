@@ -237,6 +237,31 @@ returns a structured error (e.g. `LOCK_FAILED`).
   (`Security:ProximityAwayTimeoutSeconds`); automatic locking (Phase 7) uses
   this state.
 
+## 7. Automatic Lock
+
+`GET /api/v1/settings` (authenticated) returns the active policy:
+
+```json
+{
+  "success": true,
+  "data": {
+    "proximity_enabled": true,
+    "proximity_away_timeout_seconds": 30,
+    "proximity_nearby_rssi_threshold": -70,
+    "automatic_lock_enabled": false,
+    "auto_lock_away_duration_seconds": 60
+  }
+}
+```
+
+When `automatic_lock_enabled` is true, the service locks the workstation if the
+paired phone's proximity leaves `NEARBY` for longer than
+`auto_lock_away_duration_seconds`. A single BLE scan failure is absorbed by the
+scanner's away timeout, and the auto-lock grace period is applied in addition,
+so temporary Bluetooth interference never locks the machine immediately.
+Configuration is changed on the Windows side (tray/appsettings), not over the
+API.
+
 ### POST /unpair
 
 ```json

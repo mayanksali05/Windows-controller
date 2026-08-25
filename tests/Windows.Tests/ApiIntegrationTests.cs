@@ -57,6 +57,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 ["Server:UseHttps"] = "false",
                 ["Server:Environment"] = "Development",
                 ["Server:Port"] = "0",
+                ["Security:AutomaticLockEnabled"] = "false",
             });
         });
         builder.ConfigureTestServices(services =>
@@ -173,5 +174,28 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
 
         var body = await response.Content.ReadFromJsonAsync<ApiResponse<StatusDto>>();
         Assert.Equal("UNKNOWN", body!.Data!.Proximity);
+    }
+
+    [Fact]
+    public async Task Settings_ReturnsStructuredPolicy()
+    {
+        SetBearer(await AuthenticateLaptopAsync());
+        var response = await _client.GetAsync("/api/v1/settings");
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<SettingsDto>>();
+
+        Assert.NotNull(body);
+        Assert.True(body!.Success);
+        Assert.NotNull(body.Data);
+        Assert.False(body.Data.AutomaticLockEnabled); // disabled by test config
+        Assert.True(body.Data.ProximityEnabled);
+    }
+
+    [Fact]
+    public async Task Settings_WithoutAuth_Returns401()
+    {
+        var response = await _client.GetAsync("/api/v1/settings");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 }

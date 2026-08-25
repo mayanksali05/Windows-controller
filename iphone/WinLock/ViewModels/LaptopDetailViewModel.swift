@@ -6,6 +6,7 @@ import Foundation
 @MainActor
 final class LaptopDetailViewModel: ObservableObject {
     @Published var status: LaptopStatus?
+    @Published var settings: AppSettings?
     @Published var errorMessage: String?
     @Published var isLocking = false
 
@@ -25,6 +26,10 @@ final class LaptopDetailViewModel: ObservableObject {
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+        }
+
+        if settings == nil {
+            settings = try? await client.getSettings()
         }
     }
 

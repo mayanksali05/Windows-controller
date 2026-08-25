@@ -15,4 +15,8 @@ public sealed class SecurityOptions
     public bool ProximityEnabled { get; set; } = true;
     public int ProximityAwayTimeoutSeconds { get; set; } = 30;
     public int ProximityNearbyRssiThreshold { get; set; } = -70;
+
+    /// <summary>Automatic lock after the phone is away (Phase 7).</summary>
+    public bool AutomaticLockEnabled { get; set; } = false;
+    public int AutoLockAwayDurationSeconds { get; set; } = 60;
 }

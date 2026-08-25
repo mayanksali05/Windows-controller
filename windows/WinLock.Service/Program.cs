@@ -87,6 +87,7 @@ public partial class Program
             securityOptions.ProximityNearbyRssiThreshold));
         builder.Services.AddSingleton<ProximityMonitor>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<ProximityMonitor>());
+        builder.Services.AddHostedService<AutomaticLockMonitor>();
 
         builder.Services.AddSingleton(_ => new PairingSessionService(
             TimeSpan.FromSeconds(securityOptions.PairingTokenLifetimeSeconds)));

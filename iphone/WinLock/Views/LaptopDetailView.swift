@@ -58,11 +58,20 @@ struct LaptopDetailView: View {
                 detail("Security", value: viewModel.status?.security ?? "—")
             }
             GridRow {
+                detail("Auto-lock", value: autoLockText)
+                detail("BLE", value: viewModel.settings?.proximityEnabled == true ? "Enabled" : "Off")
+            }
+            GridRow {
                 detail("Version", value: viewModel.status?.serviceVersion ?? "—")
                 detail("Environment", value: viewModel.status?.environment ?? "—")
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var autoLockText: String {
+        guard let settings = viewModel.settings else { return "—" }
+        return settings.automaticLockEnabled ? "On · \(settings.autoLockAwayDurationSeconds)s" : "Off"
     }
 
     private func detail(_ title: String, value: String) -> some View {
