@@ -23,9 +23,13 @@ public sealed class LockController : ControllerBase
             return BadRequest(ApiResponse.Failure(ErrorCodes.MalformedRequest, "Request body is invalid"));
         }
 
+        var deviceId = HttpContext.Items.TryGetValue(AuthenticationActionFilter.AuthenticatedDeviceIdKey, out var value)
+            ? value?.ToString()
+            : null;
+
         try
         {
-            await _coordinator.LockAsync(request.DeviceId, cancellationToken);
+            await _coordinator.LockAsync(deviceId, cancellationToken);
             return Ok(ApiResponse.SuccessResult("Laptop locked successfully"));
         }
         catch (LockFailedException)

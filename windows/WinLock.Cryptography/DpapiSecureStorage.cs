@@ -1,16 +1,18 @@
 using System.Security.Cryptography;
 
-namespace WinLock.Service.Security;
+namespace WinLock.Cryptography;
 
 /// <summary>
 /// File-backed store whose blobs are encrypted with DPAPI (CurrentUser scope),
 /// tying decryption to the service account on this machine. Files are stored
-/// under <c>%LOCALAPPDATA%\WinLock\storage</c> unless a directory is supplied.
+/// in the supplied directory. Writes are serialized process-wide so concurrent
+/// holders (service + tray) cannot tear or corrupt blobs.
 /// </summary>
 public sealed class DpapiSecureStorage : ISecureStorage
 {
+    private static readonly object GlobalSync = new();
+
     private readonly string _directory;
-    private readonly object _sync = new();
 
     public DpapiSecureStorage(string directory)
     {
@@ -21,28 +23,33 @@ public sealed class DpapiSecureStorage : ISecureStorage
     public void Save(string name, byte[] data)
     {
         var protectedData = ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
-        lock (_sync)
+        var path = Path.Combine(_directory, SafeName(name));
+
+        lock (GlobalSync)
         {
-            File.WriteAllBytes(Path.Combine(_directory, SafeName(name)), protectedData);
+            File.WriteAllBytes(path, protectedData);
         }
     }
 
     public byte[]? Load(string name)
     {
         var path = Path.Combine(_directory, SafeName(name));
-        if (!File.Exists(path))
+        lock (GlobalSync)
         {
-            return null;
-        }
+            if (!File.Exists(path))
+            {
+                return null;
+            }
 
-        var protectedData = File.ReadAllBytes(path);
-        return ProtectedData.Unprotect(protectedData, null, DataProtectionScope.CurrentUser);
+            var protectedData = File.ReadAllBytes(path);
+            return ProtectedData.Unprotect(protectedData, null, DataProtectionScope.CurrentUser);
+        }
     }
 
     public bool Delete(string name)
     {
         var path = Path.Combine(_directory, SafeName(name));
-        lock (_sync)
+        lock (GlobalSync)
         {
             if (!File.Exists(path))
             {

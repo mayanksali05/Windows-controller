@@ -1,22 +1,30 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography.X509Certificates;
+using WinLock.Cryptography;
+using WinLock.Protocol;
 using WinLock.Protocol.Models;
 
 namespace WinLock.Tray;
 
 /// <summary>
-/// Talks to the WinLock service over loopback. In development it obtains the
-/// runtime dev token from <c>/api/v1/dev/token</c> and pins the TLS certificate
-/// to the CN=WinLock-Development certificate thumbprint.
+/// Talks to the WinLock service over loopback. Authenticates as "the laptop
+/// itself" using the shared Windows identity key through the same
+/// challenge-response protocol the iPhone uses. TLS is pinned to the
+/// CN=WinLock-Development certificate thumbprint in development.
 /// </summary>
 public sealed class ServiceClient : IDisposable
 {
     private readonly HttpClient _http;
     private readonly string _baseUrl;
-    private string? _token;
+    private readonly DeviceIdentityService _identity;
+    private string? _sessionToken;
+    private DateTimeOffset _sessionExpires;
 
-    public ServiceClient(TrayOptions options)
+    public ServiceClient(TrayOptions options, DeviceIdentityService identity)
     {
+        _identity = identity;
         _baseUrl = options.UseHttps ? $"https://localhost:{options.Port}" : $"http://localhost:{options.Port}";
 
         var handler = new HttpClientHandler();
@@ -35,91 +43,93 @@ public sealed class ServiceClient : IDisposable
         _http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
     }
 
-    public bool Initialized => _token is not null;
-
-    /// <summary>Fetches the development bearer token (loopback).</summary>
-    public async Task<bool> InitializeAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/dev/token");
-            using var response = await _http.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                return false;
-            }
-
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<DevTokenDto>>(cancellationToken);
-            if (body?.Success != true || body.Data is null)
-            {
-                return false;
-            }
-
-            _token = body.Data.Token;
-            return true;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
     public async Task<StatusDto?> GetStatusAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/status");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var response = await _http.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<StatusDto>>(cancellationToken);
-            return body?.Data;
-        }
-        catch (Exception)
+        using var response = await SendAuthedAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/status"), cancellationToken);
+        if (response is null || !response.IsSuccessStatusCode)
         {
             return null;
         }
+
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<StatusDto>>(cancellationToken);
+        return body?.Data;
     }
 
     public async Task<(bool Success, string Message)> LockAsync(CancellationToken cancellationToken)
     {
-        try
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/lock")
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/lock")
-            {
-                Content = JsonContent.Create(new LockRequest()),
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var response = await _http.SendAsync(request, cancellationToken);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse>(cancellationToken);
-            return (response.IsSuccessStatusCode,
-                body?.Message ?? body?.Error?.Message ?? response.StatusCode.ToString());
-        }
-        catch (Exception ex)
+            Content = JsonContent.Create(new LockRequest()),
+        };
+        using var response = await SendAuthedAsync(request, cancellationToken);
+        if (response is null)
         {
-            return (false, ex.Message);
+            return (false, "Service unreachable");
         }
+
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>(cancellationToken);
+        return (response.IsSuccessStatusCode,
+            body?.Message ?? body?.Error?.Message ?? response.StatusCode.ToString());
     }
 
     /// <summary>Creates a pairing session and returns the full QR payload (authenticated).</summary>
     public async Task<PairingSessionPayloadDto?> CreatePairingSessionAsync(CancellationToken cancellationToken)
     {
+        using var response = await SendAuthedAsync(
+            new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/pair/session"), cancellationToken);
+        if (response is null || !response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<PairingSessionPayloadDto>>(cancellationToken);
+        return body?.Data;
+    }
+
+    /// <summary>Lists paired devices (authenticated).</summary>
+    public async Task<IReadOnlyList<AuthorizedDeviceDto>> ListDevicesAsync(CancellationToken cancellationToken)
+    {
+        using var response = await SendAuthedAsync(
+            new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/pair/devices"), cancellationToken);
+        if (response is null || !response.IsSuccessStatusCode)
+        {
+            return Array.Empty<AuthorizedDeviceDto>();
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<AuthorizedDeviceDto>>>(cancellationToken);
+        return (IReadOnlyList<AuthorizedDeviceDto>?)body?.Data ?? Array.Empty<AuthorizedDeviceDto>();
+    }
+
+    /// <summary>Removes a paired device (authenticated).</summary>
+    public async Task<(bool Success, string Message)> UnpairAsync(string deviceId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/unpair")
+        {
+            Content = JsonContent.Create(new UnpairRequestDto { DeviceId = deviceId }),
+        };
+        using var response = await SendAuthedAsync(request, cancellationToken);
+        if (response is null)
+        {
+            return (false, "Service unreachable");
+        }
+
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>(cancellationToken);
+        return (response.IsSuccessStatusCode,
+            body?.Message ?? body?.Error?.Message ?? response.StatusCode.ToString());
+    }
+
+    private async Task<HttpResponseMessage?> SendAuthedAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/pair/session");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var response = await _http.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            if (!await EnsureAuthenticatedAsync(cancellationToken))
             {
                 return null;
             }
 
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<PairingSessionPayloadDto>>(cancellationToken);
-            return body?.Data;
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _sessionToken);
+            return await _http.SendAsync(request, cancellationToken);
         }
         catch (Exception)
         {
@@ -127,47 +137,62 @@ public sealed class ServiceClient : IDisposable
         }
     }
 
-    /// <summary>Lists paired devices (authenticated).</summary>
-    public async Task<IReadOnlyList<AuthorizedDeviceDto>> ListDevicesAsync(CancellationToken cancellationToken)
+    private async Task<bool> EnsureAuthenticatedAsync(CancellationToken cancellationToken)
     {
-        try
+        if (_sessionToken is not null && _sessionExpires > DateTimeOffset.UtcNow)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/pair/devices");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var response = await _http.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                return Array.Empty<AuthorizedDeviceDto>();
-            }
+            return true;
+        }
 
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse<List<AuthorizedDeviceDto>>>(cancellationToken);
-            return (IReadOnlyList<AuthorizedDeviceDto>?)body?.Data ?? Array.Empty<AuthorizedDeviceDto>();
-        }
-        catch (Exception)
+        var challengeResponse = await _http.PostAsJsonAsync(
+            $"{_baseUrl}/api/v1/auth/challenge",
+            new AuthChallengeRequestDto { DeviceId = _identity.DeviceId }, cancellationToken);
+        if (!challengeResponse.IsSuccessStatusCode)
         {
-            return Array.Empty<AuthorizedDeviceDto>();
+            return false;
         }
-    }
 
-    /// <summary>Removes a paired device (authenticated).</summary>
-    public async Task<(bool Success, string Message)> UnpairAsync(string deviceId, CancellationToken cancellationToken)
-    {
-        try
+        var challengeBody = await challengeResponse.Content
+            .ReadFromJsonAsync<ApiResponse<AuthChallengeDto>>(cancellationToken);
+        if (challengeBody?.Data is null)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/unpair")
+            return false;
+        }
+
+        var timestamp = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+        var input = ProtocolStrings.AuthenticationSigningInput(
+            _identity.DeviceId, challengeBody.Data.Challenge, timestamp, ProtocolStrings.ChallengeVerifyEndpoint);
+        var signature = _identity.Sign(input);
+
+        var verifyResponse = await _http.PostAsJsonAsync(
+            $"{_baseUrl}/api/v1/auth/verify",
+            new AuthVerifyRequestDto
             {
-                Content = JsonContent.Create(new UnpairRequestDto { DeviceId = deviceId }),
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-            using var response = await _http.SendAsync(request, cancellationToken);
-            var body = await response.Content.ReadFromJsonAsync<ApiResponse>(cancellationToken);
-            return (response.IsSuccessStatusCode,
-                body?.Message ?? body?.Error?.Message ?? response.StatusCode.ToString());
-        }
-        catch (Exception ex)
+                ClientDeviceId = _identity.DeviceId,
+                ChallengeId = challengeBody.Data.ChallengeId,
+                Timestamp = timestamp,
+                Signature = Base64Url.Encode(signature),
+            }, cancellationToken);
+
+        if (!verifyResponse.IsSuccessStatusCode)
         {
-            return (false, ex.Message);
+            return false;
         }
+
+        var verifyBody = await verifyResponse.Content
+            .ReadFromJsonAsync<ApiResponse<AuthVerifyResponseDto>>(cancellationToken);
+        if (verifyBody?.Data is null)
+        {
+            return false;
+        }
+
+        _sessionToken = verifyBody.Data.SessionToken;
+        _sessionExpires = DateTimeOffset.TryParse(verifyBody.Data.SessionExpires, CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind, out var expires)
+            ? expires
+            : DateTimeOffset.UtcNow.AddMinutes(5);
+
+        return true;
     }
 
     public void Dispose() => _http.Dispose();

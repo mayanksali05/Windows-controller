@@ -37,8 +37,13 @@ A background service (.NET 8, ASP.NET Core / Kestrel) that:
 - Triggers configurable automatic lock on prolonged absence.
 - Writes structured security logs.
 - Exposes a small **tray application** (`windows/WinLock.Tray`) for status,
-  pairing, settings, and log viewing. The tray app communicates with the service
-  over a local loopback channel; it holds no secrets.
+  pairing, settings, and log viewing. The tray authenticates to the service as
+  the laptop itself using the shared Windows identity key; it holds no iPhone
+  secrets.
+
+Shared cryptography (`windows/WinLock.Cryptography`): Ed25519, DPAPI secure
+storage, device identity, and the authorized-device store are used by both the
+service and the tray so the tray can sign challenges with the laptop identity.
 
 **Locking context note:** `LockWorkStation` only affects the interactive
 session. In development the service runs in the console (interactive session)
@@ -81,13 +86,10 @@ A SwiftUI app (iOS 17+) that provides:
 | POST   | `/auth/verify`   | Yes (fresh)   | Verify signed challenge, issue session|
 | POST   | `/lock`          | Yes           | Lock workstation                     |
 | GET    | `/proximity`     | Yes           | Current proximity state               |
-| GET    | `/dev/token`     | Dev only*     | Runtime dev bearer token (Phase 2)    |
 
 `*` Pairing/auth endpoints are unauthenticated by design (no key yet). The
 one-time pairing token is **never** exposed to unauthenticated clients — it is
-only shown on the Windows screen as a QR code. The dev token endpoint is a
-Phase 2 temporary mechanism, reachable only in Development, replaced by
-Phase 4.
+only shown on the Windows screen as a QR code.
 
 ## 4. Authentication
 
@@ -99,13 +101,18 @@ Public-key challenge-response, no shared secrets.
    timestamp ‖ endpoint` with its private key (CryptoKit, Curve25519 / Ed25519).
 3. Client posts `/auth/verify` with the signature.
 4. Service verifies: device is paired, challenge is unexpired and not previously
-   seen (replay cache), timestamp is within skew, signature validates against the
-   stored iPhone public key.
-5. On success the service issues a short-lived signed session token used for
-   subsequent privileged calls (`/lock`, `/status`).
+   seen (single-use replay cache), timestamp is within skew, signature validates
+   against the stored iPhone public key.
+5. On success the service issues a short-lived HMAC-SHA256 signed session token
+   (in-memory signing key) used for subsequent privileged calls (`/lock`,
+   `/status`). Every privileged request re-checks that the device is still
+   authorized, so unpairing revokes sessions immediately.
 
-Replay protection: one-time challenges, timestamp/skew checks, per-session token
-expiry, and a bounded nonce cache. See `protocol.md`.
+Replay protection: single-use challenges, timestamp/skew checks, per-session
+token expiry, and a bounded nonce cache. See `protocol.md`.
+
+The tray application authenticates as "the laptop itself" through the same
+protocol using the shared Windows identity key (see `Cryptography`).
 
 ## 5. Pairing
 

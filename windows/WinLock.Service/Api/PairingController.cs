@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WinLock.Cryptography;
 using WinLock.Protocol;
 using WinLock.Protocol.Models;
 using WinLock.Service.Authentication;

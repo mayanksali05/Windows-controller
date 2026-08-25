@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WinLock.Cryptography\WinLock.Cryptography.csproj" />
     <ProjectReference Include="..\WinLock.Protocol\WinLock.Protocol.csproj" />
   </ItemGroup>
 

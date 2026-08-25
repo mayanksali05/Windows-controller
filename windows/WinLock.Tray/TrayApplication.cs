@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using WinLock.Cryptography;
 using WinLock.Protocol.Models;
 
 namespace WinLock.Tray;
@@ -18,7 +19,11 @@ public sealed class TrayApplication : IDisposable
     public TrayApplication(TrayOptions options)
     {
         _options = options;
-        _client = new ServiceClient(options);
+
+        var storage = new DpapiSecureStorage(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WinLock", "storage"));
+        var identity = new DeviceIdentityService(storage, new Ed25519SigningService());
+        _client = new ServiceClient(options, identity);
 
         _statusItem = new ToolStripMenuItem("Status: unknown") { Enabled = false };
 
@@ -51,12 +56,6 @@ public sealed class TrayApplication : IDisposable
 
     private async Task PollAsync()
     {
-        if (!_client.Initialized && !await _client.InitializeAsync(_cts.Token))
-        {
-            SetStatus("Service unreachable");
-            return;
-        }
-
         var status = await _client.GetStatusAsync(_cts.Token);
         if (status is null)
         {

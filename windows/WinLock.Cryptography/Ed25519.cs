@@ -2,7 +2,7 @@ using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Security;
 
-namespace WinLock.Service.Security;
+namespace WinLock.Cryptography;
 
 /// <summary>
 /// Ed25519 (RFC 8032) primitives, interoperable with CryptoKit's

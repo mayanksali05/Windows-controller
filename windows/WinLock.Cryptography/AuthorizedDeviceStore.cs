@@ -1,18 +1,20 @@
 using System.Text.Json;
-using WinLock.Protocol;
 
-namespace WinLock.Service.Security;
+namespace WinLock.Cryptography;
 
 /// <summary>
-/// DPAPI-protected store of authorized iPhone public keys and metadata.
+/// DPAPI-protected store of authorized client public keys and metadata.
 /// Adding, listing, and removing are thread-safe and persisted atomically.
+/// File access is serialized process-wide so overlapping holders (service +
+/// tray) cannot corrupt the blob.
 /// </summary>
 public sealed class AuthorizedDeviceStore
 {
     private const string StoreKeyName = "authorized-devices.v1";
+    private static readonly object GlobalSync = new();
 
     private readonly ISecureStorage _storage;
-    private readonly object _sync = new();
+    private readonly object _instanceSync = new();
     private readonly Dictionary<string, AuthorizedDevice> _devices;
 
     public AuthorizedDeviceStore(ISecureStorage storage)
@@ -23,12 +25,12 @@ public sealed class AuthorizedDeviceStore
 
     public int Count
     {
-        get { lock (_sync) { return _devices.Count; } }
+        get { lock (_instanceSync) { return _devices.Count; } }
     }
 
     public bool IsPaired(string deviceId)
     {
-        lock (_sync)
+        lock (_instanceSync)
         {
             return _devices.ContainsKey(deviceId);
         }
@@ -36,7 +38,7 @@ public sealed class AuthorizedDeviceStore
 
     public AuthorizedDevice? GetByDeviceId(string deviceId)
     {
-        lock (_sync)
+        lock (_instanceSync)
         {
             return _devices.GetValueOrDefault(deviceId);
         }
@@ -44,7 +46,7 @@ public sealed class AuthorizedDeviceStore
 
     public IReadOnlyList<AuthorizedDevice> GetAll()
     {
-        lock (_sync)
+        lock (_instanceSync)
         {
             return _devices.Values.OrderBy(d => d.PairedAtUtc).ToList();
         }
@@ -52,7 +54,7 @@ public sealed class AuthorizedDeviceStore
 
     public bool TryAdd(AuthorizedDevice device)
     {
-        lock (_sync)
+        lock (_instanceSync)
         {
             if (_devices.ContainsKey(device.DeviceId))
             {
@@ -67,7 +69,7 @@ public sealed class AuthorizedDeviceStore
 
     public bool TryRemove(string deviceId)
     {
-        lock (_sync)
+        lock (_instanceSync)
         {
             if (!_devices.Remove(deviceId))
             {
@@ -81,26 +83,32 @@ public sealed class AuthorizedDeviceStore
 
     private Dictionary<string, AuthorizedDevice> Load()
     {
-        var data = _storage.Load(StoreKeyName);
-        if (data is null)
+        lock (GlobalSync)
         {
-            return new Dictionary<string, AuthorizedDevice>();
-        }
+            var data = _storage.Load(StoreKeyName);
+            if (data is null)
+            {
+                return new Dictionary<string, AuthorizedDevice>();
+            }
 
-        try
-        {
-            var list = JsonSerializer.Deserialize<List<AuthorizedDevice>>(data) ?? new List<AuthorizedDevice>();
-            return list.ToDictionary(d => d.DeviceId);
-        }
-        catch (JsonException)
-        {
-            return new Dictionary<string, AuthorizedDevice>();
+            try
+            {
+                var list = JsonSerializer.Deserialize<List<AuthorizedDevice>>(data) ?? new List<AuthorizedDevice>();
+                return list.ToDictionary(d => d.DeviceId);
+            }
+            catch (JsonException)
+            {
+                return new Dictionary<string, AuthorizedDevice>();
+            }
         }
     }
 
     private void Persist()
     {
-        var list = _devices.Values.ToList();
-        _storage.Save(StoreKeyName, JsonSerializer.SerializeToUtf8Bytes(list));
+        lock (GlobalSync)
+        {
+            var list = _devices.Values.ToList();
+            _storage.Save(StoreKeyName, JsonSerializer.SerializeToUtf8Bytes(list));
+        }
     }
 }

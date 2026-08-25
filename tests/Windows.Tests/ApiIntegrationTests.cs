@@ -54,17 +54,10 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<string> GetDevTokenAsync()
-    {
-        var response = await _client.GetAsync("/api/v1/dev/token");
-        response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadFromJsonAsync<ApiResponse<DevTokenDto>>();
-        Assert.NotNull(body?.Data);
-        return body!.Data!.Token;
-    }
-
     private void SetBearer(string token) =>
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+    private async Task<string> AuthenticateLaptopAsync() => await TestLaptop.AuthenticateAsync(_client);
 
     [Fact]
     public async Task Unauthenticated_Status_Returns401()
@@ -83,7 +76,7 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task InvalidToken_Returns401()
     {
-        SetBearer("not-the-token");
+        SetBearer("not-a-session-token");
         var response = await _client.GetAsync("/api/v1/status");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -91,7 +84,7 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task ValidToken_Status_ReturnsStructuredSuccess()
     {
-        SetBearer(await GetDevTokenAsync());
+        SetBearer(await AuthenticateLaptopAsync());
         var response = await _client.GetAsync("/api/v1/status");
 
         response.EnsureSuccessStatusCode();
@@ -106,7 +99,7 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task ValidToken_Lock_ReturnsSuccess()
     {
-        SetBearer(await GetDevTokenAsync());
+        SetBearer(await AuthenticateLaptopAsync());
         var response = await _client.PostAsJsonAsync("/api/v1/lock", new LockRequest());
 
         response.EnsureSuccessStatusCode();
@@ -120,18 +113,11 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task MalformedLockBody_ReturnsBadRequest()
     {
-        SetBearer(await GetDevTokenAsync());
+        SetBearer(await AuthenticateLaptopAsync());
         var content = new StringContent("{ this is not json", Encoding.UTF8, "application/json");
 
         var response = await _client.PostAsync("/api/v1/lock", content);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task DevToken_Endpoint_IsAnonymous()
-    {
-        var response = await _client.GetAsync("/api/v1/dev/token");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

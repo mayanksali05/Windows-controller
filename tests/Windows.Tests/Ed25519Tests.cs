@@ -1,5 +1,5 @@
+using WinLock.Cryptography;
 using WinLock.Protocol;
-using WinLock.Service.Security;
 using Xunit;
 
 namespace Windows.Tests;

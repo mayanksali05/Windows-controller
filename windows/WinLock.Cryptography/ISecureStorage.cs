@@ -1,4 +1,4 @@
-namespace WinLock.Service.Security;
+namespace WinLock.Cryptography;
 
 /// <summary>
 /// Abstraction over OS-protected secret storage (DPAPI in the default

@@ -86,8 +86,8 @@ See `docs/protocol.md`. Summary:
 | POST   | `/api/v1/pair/confirm` | one-time token + sig |
 | GET    | `/api/v1/pair/devices` | session |
 | POST   | `/api/v1/unpair` | session |
-| POST   | `/api/v1/auth/challenge` | — |
-| POST   | `/api/v1/auth/verify` | sig |
+| POST   | `/api/v1/auth/challenge` | anonymous (paired device) |
+| POST   | `/api/v1/auth/verify` | single-use challenge + sig |
 | POST   | `/api/v1/lock` | session |
 | GET    | `/api/v1/proximity` | session |
 
@@ -130,6 +130,7 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 ```
 /iphone       iOS app
 /windows/WinLock.Protocol  shared protocol models + error codes
+/windows/WinLock.Cryptography  shared Ed25519 + DPAPI storage + identity
 /windows/WinLock.Service   background service
 /windows/WinLock.Tray      tray/status app
 /tests        .NET tests
@@ -142,7 +143,7 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 1. ✅ Repository + architecture
 2. ✅ Windows service + authenticated API + lock
 3. ✅ Secure pairing
-4. ⬜ Challenge-response authentication
+4. ✅ Challenge-response authentication
 5. ⬜ iPhone application
 6. ⬜ BLE proximity
 7. ⬜ Automatic lock

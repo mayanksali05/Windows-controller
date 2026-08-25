@@ -42,14 +42,20 @@
 
 See `protocol.md` for messages. Security-relevant properties:
 
-- One-time challenges (cryptographically secure random nonces, min 32 bytes).
+- One-time challenges (cryptographically secure random nonces, min 32 bytes),
+  bound to the requesting device and consumed on first use.
 - Challenge lifetime bound (`Security:ChallengeLifetimeSeconds`, default 30).
-- Timestamp skew check.
-- Replay cache: used nonces are rejected (bounded, time-windowed).
-- Signatures over `device_id ‖ challenge ‖ timestamp ‖ target_endpoint`.
+- Timestamp skew check (`Security:MaxClockSkewSeconds`).
+- Single-use replay cache: a consumed challenge is rejected.
+- Signatures over `device_id ‖ challenge ‖ timestamp ‖ target_endpoint`
+  (Ed25519, deterministic).
 - Face ID (`LAContext`) gates the signing operation on the iPhone.
-- Sessions: after `/auth/verify` the service returns a short-lived signed token
-  (`Security:SessionLifetimeSeconds`) used for privileged calls.
+- Sessions: after `/auth/verify` the service returns a short-lived HMAC-SHA256
+  signed token (`Security:SessionLifetimeMinutes`) whose signing key lives in
+  memory for the process lifetime (sessions end on restart). Every privileged
+  request re-checks device authorization, so unpairing revokes immediately.
+- The tray application authenticates as the laptop itself using the Windows
+  identity key through the same protocol — no dev token exists.
 
 ## 5. Privileged Operations
 

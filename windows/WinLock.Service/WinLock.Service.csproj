@@ -11,12 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WinLock.Cryptography\WinLock.Cryptography.csproj" />
     <ProjectReference Include="..\WinLock.Protocol\WinLock.Protocol.csproj" />
   </ItemGroup>
 

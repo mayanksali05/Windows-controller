@@ -50,7 +50,11 @@ public sealed class AuthenticationActionFilter : IAsyncActionFilter
             return;
         }
 
-        _log.Log(SecurityEventType.AuthenticationSuccess, "Authentication succeeded", new { path });
+        context.HttpContext.Items[AuthenticatedDeviceIdKey] = result.DeviceId;
+        _log.Log(SecurityEventType.AuthenticationSuccess, "Authentication succeeded",
+            new { path, deviceId = result.DeviceId });
         await next();
     }
+
+    public const string AuthenticatedDeviceIdKey = "WinLock.AuthenticatedDeviceId";
 }

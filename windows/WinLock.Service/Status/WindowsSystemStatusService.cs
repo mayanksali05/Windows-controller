@@ -1,7 +1,7 @@
+using WinLock.Cryptography;
 using WinLock.Protocol.Models;
 using WinLock.Service.Configuration;
 using WinLock.Service.Locking;
-using WinLock.Service.Security;
 
 namespace WinLock.Service.Status;
 

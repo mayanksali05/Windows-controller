@@ -1,4 +1,4 @@
-namespace WinLock.Service.Security;
+namespace WinLock.Cryptography;
 
 /// <summary>Ed25519 signing/verification operations.</summary>
 public interface ISigningService

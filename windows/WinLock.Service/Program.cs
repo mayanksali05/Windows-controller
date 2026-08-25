@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting.WindowsServices;
+using WinLock.Cryptography;
 using WinLock.Protocol;
 using WinLock.Protocol.Models;
 using WinLock.Service.Authentication;
@@ -30,13 +31,16 @@ public partial class Program
         var serverOptions = builder.Configuration
             .GetSection(ServerOptions.SectionName)
             .Get<ServerOptions>() ?? new ServerOptions();
-
         builder.Services.AddSingleton(serverOptions);
+
+        var securityOptions = builder.Configuration
+            .GetSection(SecurityOptions.SectionName)
+            .Get<SecurityOptions>() ?? new SecurityOptions();
+        builder.Services.AddSingleton(securityOptions);
         builder.Services.Configure<SecurityOptions>(builder.Configuration.GetSection(SecurityOptions.SectionName));
 
         builder.Host.UseWindowsService(options => options.ServiceName = "WinLockService");
 
-        builder.Services.AddSingleton<IDevelopmentModeDetector, DevelopmentModeDetector>();
         builder.Services.AddSingleton<ISecurityEventLogger>(_ =>
         {
             var configured = builder.Configuration["Logging:Directory"];
@@ -47,12 +51,6 @@ public partial class Program
                 : configured;
             return new FileSecurityEventLogger(directory);
         });
-
-        builder.Services.AddSingleton<DevTokenService>();
-        builder.Services.AddSingleton<IAuthenticationService, DevelopmentAuthenticationService>();
-        builder.Services.AddSingleton<IWindowsLockService, WindowsLockService>();
-        builder.Services.AddSingleton<LockCoordinator>();
-        builder.Services.AddSingleton<ISystemStatusService, WindowsSystemStatusService>();
 
         builder.Services.AddSingleton<ISigningService, Ed25519SigningService>();
         builder.Services.AddSingleton<ISecureStorage>(_ =>
@@ -67,9 +65,20 @@ public partial class Program
         });
         builder.Services.AddSingleton<DeviceIdentityService>();
         builder.Services.AddSingleton<AuthorizedDeviceStore>();
+        builder.Services.AddSingleton<DeviceAuthorizer>();
+
+        builder.Services.AddSingleton(_ => new ChallengeStore(
+            TimeSpan.FromSeconds(securityOptions.ChallengeLifetimeSeconds)));
+        builder.Services.AddSingleton(_ => new SessionTokenService(
+            TimeSpan.FromMinutes(securityOptions.SessionLifetimeMinutes)));
+        builder.Services.AddSingleton<IAuthenticationService, ChallengeResponseAuthenticationService>();
+
+        builder.Services.AddSingleton<IWindowsLockService, WindowsLockService>();
+        builder.Services.AddSingleton<LockCoordinator>();
+        builder.Services.AddSingleton<ISystemStatusService, WindowsSystemStatusService>();
+
         builder.Services.AddSingleton(_ => new PairingSessionService(
-            TimeSpan.FromSeconds(builder.Configuration.GetValue<int>(
-                "Security:PairingTokenLifetimeSeconds", 300))));
+            TimeSpan.FromSeconds(securityOptions.PairingTokenLifetimeSeconds)));
 
         builder.Services.AddControllers(options =>
         {
@@ -117,13 +126,14 @@ public partial class Program
 
         var app = builder.Build();
 
-        var mode = app.Services.GetRequiredService<IDevelopmentModeDetector>();
-        if (!mode.IsDevelopment)
+        var isDevelopment = app.Environment.IsDevelopment() ||
+            string.Equals(serverOptions.Environment, "Development", StringComparison.OrdinalIgnoreCase);
+
+        if (!isDevelopment && !serverOptions.UseHttps)
         {
             throw new InvalidOperationException(
-                "Production environment detected but no production authentication provider is " +
-                "configured yet (challenge-response arrives in Phase 4). " +
-                "Refusing to start with development-only authentication outside Development.");
+                "Production mode requires HTTPS (Server:UseHttps=true). " +
+                "Refusing to serve plaintext outside Development.");
         }
 
         if (app.Environment.IsDevelopment())
@@ -134,12 +144,11 @@ public partial class Program
         app.UseRateLimiter();
         app.MapControllers();
 
-        if (mode.IsDevelopment)
+        if (isDevelopment)
         {
-            var tokens = app.Services.GetRequiredService<DevTokenService>();
             Console.WriteLine("[WinLock] Development mode active.");
             Console.WriteLine($"[WinLock] Listening on {(serverOptions.UseHttps ? "https" : "http")}://{serverOptions.BindAddress}:{serverOptions.Port}");
-            Console.WriteLine($"[WinLock] Development bearer token: {tokens.Token}");
+            Console.WriteLine("[WinLock] Pairing sessions are created from the tray application (or POST /api/v1/pair/session once authenticated).");
         }
 
         await app.RunAsync();

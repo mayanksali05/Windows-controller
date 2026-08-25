@@ -33,7 +33,7 @@ cannot pair their own device.
 
 ### 2.1 Create a session (authenticated, tray)
 
-`POST /api/v1/pair/session` (requires a valid session/dev token)
+`POST /api/v1/pair/session` (requires a valid session token)
 
 Returns the full QR payload including the one-time token:
 
@@ -110,7 +110,7 @@ key is stored (DPAPI) and the device becomes authorized.
 
 ## 3. Authentication
 
-`POST /auth/challenge`
+`POST /api/v1/auth/challenge` (anonymous; device must be paired)
 
 ```json
 { "device_id": "<iphone-device-id>" }
@@ -119,24 +119,29 @@ key is stored (DPAPI) and the device becomes authorized.
 ```json
 {
   "success": true,
-  "challenge": "<base64url nonce>",
-  "challenge_id": "<uuid>",
-  "expires_at": "<ISO8601>"
+  "data": {
+    "challenge_id": "<random id>",
+    "challenge": "<base64url nonce>",
+    "expires_at": "<ISO8601>"
+  }
 }
 ```
 
-iPhone: Face ID via `LAContext`, then sign:
+Unknown devices receive `DEVICE_UNKNOWN` (404). The laptop itself (tray
+application, using the Windows identity key) is also an authorized device.
+
+iPhone: Face ID via `LAContext`, then sign (Ed25519, deterministic):
 
 ```
 signed = sign(prvKey, client_device_id ‖ challenge ‖ timestamp ‖ "/api/v1/auth/verify")
 ```
 
-`POST /auth/verify`
+`POST /api/v1/auth/verify` (anonymous, single-use challenge)
 
 ```json
 {
   "client_device_id": "<iphone-device-id>",
-  "challenge_id": "<uuid>",
+  "challenge_id": "<challenge id>",
   "timestamp": "<ISO8601>",
   "signature": "<base64url>"
 }
@@ -144,22 +149,30 @@ signed = sign(prvKey, client_device_id ‖ challenge ‖ timestamp ‖ "/api/v1/
 
 Windows verifies in order:
 
-1. Device is paired and authorized.
-2. Challenge exists, unexpired, not previously consumed (replay cache).
+1. Challenge exists, unexpired, not previously consumed (single-use replay cache).
+2. Device is paired and authorized (or is the laptop itself).
 3. Timestamp within skew (`Security:MaxClockSkewSeconds`).
-4. Signature valid against the stored iPhone public key over the exact
-   canonical string.
+4. Signature valid against the stored public key over the exact canonical
+   string (the timestamp used is the verbatim string the client sent).
 
-On success:
+On success the challenge is consumed and a short-lived HMAC-SHA256 signed
+session token is issued:
 
 ```json
 {
   "success": true,
-  "session_token": "<base64url signed token>",
-  "session_expires": "<ISO8601>",
-  "proximity": "NEARBY"
+  "data": {
+    "session_token": "<signed token>",
+    "session_expires": "<ISO8601>",
+    "proximity": "UNKNOWN"
+  }
 }
 ```
+
+Session tokens carry the device id and an absolute expiry; the signing key is
+generated at startup (in memory), so all sessions end on service restart
+(fail-safe). Replay/expired challenges return `CHALLENGE_REPLAYED` /
+`CHALLENGE_EXPIRED`.
 
 ## 4. Privileged Commands
 
@@ -225,22 +238,14 @@ recomputes the same sequence. Curve25519 refers to Ed25519 for signatures
 .NET `NSec`/BouncyCastle equivalent or `Curve25519` support as available and
 documented.
 
-## 5.5 Development-Only Token Endpoint
+## 5.5 Session Tokens
 
-**Phase 2 temporary mechanism, isolated from production security.**
-
-`GET /api/v1/dev/token` (anonymous, reachable only when the service runs in the
-Development environment):
-
-```json
-{ "success": true, "data": { "token": "<runtime-random-bearer-token>" } }
-```
-
-The token is generated at startup from a CSPRNG (never hardcoded), kept in
-memory, and used as `Authorization: Bearer <token>` to exercise the API until
-the challenge-response protocol (Phase 4) replaces it. Outside Development the
-service refuses to start while this is the only authentication provider
-(fail-secure).
+Privileged requests send `Authorization: Bearer <session_token>` where the
+token is the value returned by `auth/verify`. Tokens are HMAC-SHA256 signed,
+carry the device id and an absolute expiry, and are validated on every request.
+The signing key is generated at process start and held in memory, so a service
+restart invalidates all sessions (fail-safe). Unpairing a device revokes its
+sessions immediately because each request re-checks authorization.
 
 ## 6. Error Codes
 

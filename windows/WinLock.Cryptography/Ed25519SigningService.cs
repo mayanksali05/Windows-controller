@@ -1,4 +1,4 @@
-namespace WinLock.Service.Security;
+namespace WinLock.Cryptography;
 
 public sealed class Ed25519SigningService : ISigningService
 {

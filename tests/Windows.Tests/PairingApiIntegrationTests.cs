@@ -2,10 +2,10 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using WinLock.Cryptography;
 using WinLock.Protocol;
 using WinLock.Protocol.Models;
 using WinLock.Service;
-using WinLock.Service.Security;
 using Xunit;
 
 namespace Windows.Tests;
@@ -22,12 +22,6 @@ public sealed record TestClientIdentity(string DeviceId, byte[] PrivateSeed, byt
 
     public string Sign(string nonce) =>
         Base64Url.Encode(Ed25519.Sign(PrivateSeed, ProtocolStrings.PairingSigningInput(DeviceId, nonce)));
-
-    public bool Verify(string publicKeyBase64Url, string nonce, string signature) =>
-        Ed25519.Verify(
-            Base64Url.Decode(publicKeyBase64Url),
-            ProtocolStrings.PairingSigningInput(DeviceId, nonce),
-            Base64Url.Decode(signature));
 }
 
 public sealed class PairingApiIntegrationTests : IClassFixture<ApiFactory>
@@ -43,15 +37,6 @@ public sealed class PairingApiIntegrationTests : IClassFixture<ApiFactory>
         _client.DefaultRequestHeaders.Authorization =
             token is null ? null : new AuthenticationHeaderValue("Bearer", token);
 
-    private async Task<string> GetDevTokenAsync()
-    {
-        var response = await _client.GetAsync("/api/v1/dev/token");
-        response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadFromJsonAsync<ApiResponse<DevTokenDto>>();
-        Assert.NotNull(body?.Data);
-        return body!.Data!.Token;
-    }
-
     private async Task<PairingSessionPayloadDto> CreateSessionAsync(string token)
     {
         SetBearer(token);
@@ -65,7 +50,7 @@ public sealed class PairingApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Pairing_EndToEnd_Works_And_Unpairs()
     {
-        var token = await GetDevTokenAsync();
+        var token = await TestLaptop.AuthenticateAsync(_client);
         var payload = await CreateSessionAsync(token);
 
         // Windows proves identity by signing the nonce over the *server* device id.
@@ -111,7 +96,7 @@ public sealed class PairingApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Confirm_WithBadSignature_IsRejected()
     {
-        var token = await GetDevTokenAsync();
+        var token = await TestLaptop.AuthenticateAsync(_client);
         var payload = await CreateSessionAsync(token);
         var phone = TestClientIdentity.Create($"phone-{Guid.NewGuid():N}"[..16]);
 
@@ -133,7 +118,7 @@ public sealed class PairingApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Confirm_WithUnknownPublicKey_IsRejected()
     {
-        var token = await GetDevTokenAsync();
+        var token = await TestLaptop.AuthenticateAsync(_client);
         var payload = await CreateSessionAsync(token);
         var phone = TestClientIdentity.Create($"phone-{Guid.NewGuid():N}"[..16]);
 
@@ -153,7 +138,7 @@ public sealed class PairingApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task Confirm_TokenReplay_IsRejected()
     {
-        var token = await GetDevTokenAsync();
+        var token = await TestLaptop.AuthenticateAsync(_client);
         var payload = await CreateSessionAsync(token);
         var phoneA = TestClientIdentity.Create($"phone-{Guid.NewGuid():N}"[..16]);
         var phoneB = TestClientIdentity.Create($"phone-{Guid.NewGuid():N}"[..16]);
@@ -187,7 +172,7 @@ public sealed class PairingApiIntegrationTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task PairRequest_ReturnsIdentity_AndVerifiesSignature()
     {
-        var token = await GetDevTokenAsync();
+        var token = await TestLaptop.AuthenticateAsync(_client);
         var payload = await CreateSessionAsync(token);
 
         SetBearer(null);

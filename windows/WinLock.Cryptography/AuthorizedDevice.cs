@@ -1,6 +1,6 @@
-namespace WinLock.Service.Security;
+namespace WinLock.Cryptography;
 
-/// <summary>A successfully paired iPhone.</summary>
+/// <summary>A successfully paired client device.</summary>
 public sealed class AuthorizedDevice
 {
     public string DeviceId { get; init; } = string.Empty;
