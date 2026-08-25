@@ -95,10 +95,19 @@ cryptographic secrets. See `Logging` in the Windows service.
 
 ## 9. Windows Unlock
 
-Unlocking a locked session requires OS-supported integration (Credential
-Provider, Windows Hello/FIDO2). This is exposed as
-`IWindowsAuthenticationProvider` and is a documented extension point until a
-supported integration is implemented. See `architecture.md` §8 and README.
+Unlocking a locked session requires OS-supported integration. Research
+(`docs/windows-unlock.md`) found that:
+
+- A **Credential Provider** is the only supported logon integration point, but
+  it is not an enforcement mechanism — the user's real Windows Hello gesture,
+  PIN, or password is still required on the laptop.
+- **Windows Hello / FIDO2 / passkeys** only apply through OS-managed enrollment
+  (e.g., the iPhone enrolled as a Windows Hello security key).
+
+Neither is implementable as a safe companion-service feature today. The codebase
+exposes `IWindowsAuthenticationProvider` as a documented extension point with no
+implementation and no `/unlock` endpoint. No keyboard-injection or
+Winlogon-bypass approach is shipped.
 
 ## 10. Residual Risks (summary)
 

@@ -198,4 +198,13 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
         var response = await _client.GetAsync("/api/v1/settings");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Unlock_Endpoint_DoesNotExist()
+    {
+        // The unlock capability is a documented extension point; there must be
+        // no /unlock route (a fabricated endpoint would be an auth bypass).
+        var response = await _client.PostAsJsonAsync("/api/v1/unlock", new { device_id = "x" });
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }

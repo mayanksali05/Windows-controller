@@ -140,10 +140,22 @@ See `docs/setup.md` §6.
 
 ## 14. Windows Unlock Limitations
 
-Unlocking a locked session from an external device requires an OS-supported
-integration (Credential Provider, Windows Hello/FIDO2). This is represented by
-`IWindowsAuthenticationProvider` and is a **documented extension point**; it is
-not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8.
+Unlocking a locked session requires OS-supported integration. Research
+(`docs/windows-unlock.md`) concluded:
+
+- A **Windows Credential Provider** (C++ COM) is the only supported logon
+  integration point, but credential providers are not enforcement mechanisms —
+  the user's real Windows Hello gesture, PIN, or password is still required on
+  the laptop, so an iPhone could at most trigger the flow, never replace the
+  credential.
+- **Windows Hello / FIDO2 / passkeys** require the iPhone to be enrolled as a
+  Windows Hello security key — a deep, user-interactive OS enrollment outside a
+  companion service's scope.
+
+Unlock is therefore a **documented extension point** represented by
+`IWindowsAuthenticationProvider` with **no implementation and no `/unlock`
+endpoint**. No bypass, credential fabrication, keyboard injection, or Windows
+authentication weakening is shipped.
 
 ## Repository Layout
 
@@ -154,7 +166,7 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 /windows/WinLock.Service   background service
 /windows/WinLock.Tray      tray/status app
 /tests        .NET tests
-/docs         architecture, security, protocol, setup, threat model
+/docs         architecture, security, protocol, setup, threat model, windows-unlock
 /scripts      setup/build/run/test scripts
 ```
 
@@ -167,4 +179,4 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 5. ✅ iPhone application (SwiftUI — builds on macOS/Xcode)
 6. ✅ BLE proximity
 7. ✅ Automatic lock
-8. ⬜ Windows unlock research / extension point
+8. ✅ Windows unlock research / extension point

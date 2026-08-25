@@ -214,17 +214,24 @@ Boundaries and invariants:
 
 ## 8. Windows Unlock (extension point)
 
-Unlocking a locked Windows session from an external device is **not** supported
-by a simple documented API. Options that are legitimate (and complex):
+Research concluded (see `docs/windows-unlock.md`): unlocking a locked Windows
+session is only possible through the OS credential stack (Winlogon). The
+supported options are:
 
-- **Credential Provider (V2)** written in C++ that performs the unlock through
-  Winlogon — significant complexity and requires admin install.
-- **Windows Hello / FIDO2 / WebAuthn passkey** flows, where available, integrated
-  with the OS credential stack.
+- **Windows Credential Provider** (C++ COM, admin install): the only supported
+  logon integration point, but credential providers are *not* enforcement
+  mechanisms — the LSA validates credentials, so the user's real Windows Hello
+  gesture, PIN, or password is still required on the laptop. An iPhone could at
+  most trigger such a flow, never replace the credential.
+- **FIDO2 / WebAuthn passkeys**: an iPhone could be a FIDO2 authenticator only
+  if enrolled as a Windows Hello security key for the account — a deep,
+  user-interactive OS enrollment outside the scope of a companion service.
 
-Until one is implemented, the codebase exposes `IWindowsAuthenticationProvider`
-and the feature remains a documented extension point. No keyboard-injection or
-Winlogon-bypass approach will be shipped.
+Neither is implementable as a safe companion-service feature today. The codebase
+exposes `IWindowsAuthenticationProvider` as a clean boundary with **no
+implementation** and **no `/unlock` endpoint**; the feature remains a documented
+extension point. No keyboard-injection, credential-fabrication, or
+Winlogon-bypass approach is shipped.
 
 ## 9. Repository Layout
 

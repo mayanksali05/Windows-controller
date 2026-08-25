@@ -117,9 +117,10 @@ Each entry records attack, impact, mitigation, and residual risk.
   credentials.
 - **Impact:** would be a critical auth bypass.
 - **Mitigation:** the system has **no** unlock path and no credential handling.
-  `IWindowsAuthenticationProvider` is an abstraction; the only hypothetical
-  implementations use supported OS mechanisms (Credential Provider / Hello /
-  FIDO2) that keep Winlogon in control.
+  `IWindowsAuthenticationProvider` is an abstraction with no implementation and
+  no `/unlock` endpoint. Research (`docs/windows-unlock.md`) shows the only
+  supported unlock integrations (Credential Provider, Hello/FIDO2 enrollment)
+  keep Winlogon in control and still require the user's real credentials.
 - **Residual risk:** None introduced by this design. Explicitly documented
   non-goal; any future unlock integration must go through the supported OS path.
 
