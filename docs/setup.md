@@ -27,20 +27,29 @@ starts automatically and restarts on crash.
 
 ## 2. iPhone App
 
-Open `iphone/` in Xcode. Required capabilities (Info.plist / entitlements):
+Open `iphone/` and generate the project with XcodeGen (`brew install xcodegen`):
 
-- **Bluetooth Always** (`NSBluetoothAlwaysUsageDescription`) — BLE proximity.
+```bash
+cd iphone
+xcodegen generate
+open WinLock.xcodeproj
+```
+
+(Alternatively create the project manually in Xcode and add the `WinLock/`
+sources.) Required capabilities (Info.plist / entitlements):
+
+- **Bluetooth Always** (`NSBluetoothAlwaysUsageDescription`) — BLE proximity
+  (used in a later phase; declared now so no crash occurs when BLE starts).
 - **Local Network** (`NSLocalNetworkUsageDescription`) — discovery and HTTPS to
   the laptop.
 - **Face ID** (`NSFaceIDUsageDescription`) — LocalAuthentication gate.
-- **Keychain** — no usage string needed, but a Keychain access group if
-  sharing across extensions.
+- **Camera** (`NSCameraUsageDescription`) — QR pairing.
+- **Keychain** — via the `keychain-access-groups` entitlement.
 - **Background modes:** `bluetooth-central` / `bluetooth-peripheral` if
-  proximity should keep working in the background; `location` is **not**
-  required.
+  proximity should keep working in the background.
 
-Do not request unused permissions (e.g. camera is only needed for QR pairing,
-so the pairing sheet must declare `NSCameraUsageDescription`).
+Do not request unused permissions (the camera sheet is only shown during
+pairing; Bluetooth is only used once the proximity feature starts).
 
 ## 3. Pairing Procedure
 

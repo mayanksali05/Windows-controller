@@ -36,6 +36,13 @@ public sealed class PairingSessionPayloadDto
     public string PairingToken { get; init; } = string.Empty;
     public string ExpiresAt { get; init; } = string.Empty;
     public string Signature { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Base64url SHA-256 of the HTTPS leaf certificate (DER), delivered out of
+    /// band via the QR so the iPhone can pin TLS before its first connection.
+    /// Empty when HTTPS is disabled (development only).
+    /// </summary>
+    public string TlsPin { get; init; } = string.Empty;
 }
 
 /// <summary>Body of <c>POST /api/v1/pair/confirm</c> (anonymous).</summary>

@@ -4,6 +4,7 @@ using WinLock.Cryptography;
 using WinLock.Protocol;
 using WinLock.Protocol.Models;
 using WinLock.Service.Authentication;
+using WinLock.Service.Certificates;
 using WinLock.Service.Logging;
 using WinLock.Service.Pairing;
 using WinLock.Service.Security;
@@ -26,19 +27,22 @@ public sealed class PairingController : ControllerBase
     private readonly AuthorizedDeviceStore _devices;
     private readonly ISigningService _signing;
     private readonly ISecurityEventLogger _log;
+    private readonly TlsPinProvider _tlsPin;
 
     public PairingController(
         DeviceIdentityService identity,
         PairingSessionService sessions,
         AuthorizedDeviceStore devices,
         ISigningService signing,
-        ISecurityEventLogger log)
+        ISecurityEventLogger log,
+        TlsPinProvider tlsPin)
     {
         _identity = identity;
         _sessions = sessions;
         _devices = devices;
         _signing = signing;
         _log = log;
+        _tlsPin = tlsPin;
     }
 
     /// <summary>
@@ -160,6 +164,7 @@ public sealed class PairingController : ControllerBase
             PairingToken = session.Token,
             ExpiresAt = session.ExpiresAtUtc.ToString("O"),
             Signature = Base64Url.Encode(_identity.Sign(message)),
+            TlsPin = _tlsPin.TlsPin ?? string.Empty,
         };
 
         _log.Log(SecurityEventType.PairingStarted, "Pairing session created",

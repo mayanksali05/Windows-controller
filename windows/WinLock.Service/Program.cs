@@ -9,6 +9,7 @@ using WinLock.Protocol.Models;
 using WinLock.Service.Authentication;
 using WinLock.Service.Certificates;
 using WinLock.Service.Configuration;
+using WinLock.Service.Discovery;
 using WinLock.Service.Logging;
 using WinLock.Service.Locking;
 using WinLock.Service.Pairing;
@@ -66,6 +67,9 @@ public partial class Program
         builder.Services.AddSingleton<DeviceIdentityService>();
         builder.Services.AddSingleton<AuthorizedDeviceStore>();
         builder.Services.AddSingleton<DeviceAuthorizer>();
+        builder.Services.AddSingleton<TlsPinProvider>();
+        builder.Services.AddSingleton<IDiscoveryAdvertiser, MdnsResponder>();
+        builder.Services.AddHostedService<DiscoveryBackgroundService>();
 
         builder.Services.AddSingleton(_ => new ChallengeStore(
             TimeSpan.FromSeconds(securityOptions.ChallengeLifetimeSeconds)));

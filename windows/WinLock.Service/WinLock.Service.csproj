@@ -19,4 +19,8 @@
     <ProjectReference Include="..\WinLock.Protocol\WinLock.Protocol.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Windows.Tests" />
+  </ItemGroup>
+
 </Project>

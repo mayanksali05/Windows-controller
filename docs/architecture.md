@@ -120,11 +120,13 @@ protocol using the shared Windows identity key (see `Cryptography`).
    protected); the device ID is derived from the public key.
 2. The tray application creates a pairing session and shows a QR code
    containing the Windows device ID, public key, one-time nonce, one-time
-   pairing token, and a signature over the nonce.
+   pairing token, a signature over the nonce, and the **TLS pin** (SHA-256 of
+   the HTTPS leaf certificate).
 3. iPhone generates its own key pair, scans the QR, verifies the Windows
-   signature, and stores the Windows public key in Keychain.
+   signature, and stores the Windows public key and TLS pin in Keychain.
 4. iPhone sends its device ID, public key, and a signature over the pairing
-   nonce (proving possession of its private key) to `/pair/confirm`.
+   nonce (proving possession of its private key) to `/pair/confirm`, with TLS
+   already pinned from the QR.
 5. Windows verifies the token (single-use), the signature, stores the iPhone
    public key (DPAPI), and marks the device authorized.
 6. Both sides mark the pairing complete; future requests require the signed
@@ -133,6 +135,13 @@ protocol using the shared Windows identity key (see `Cryptography`).
 Trust is established by physical possession of the QR scan, not by network
 position. The one-time pairing token never travels over the network. See
 `protocol.md` for the message format.
+
+## 5.1 Discovery
+
+The service advertises `_mywinlock._tcp` via a dependency-free mDNS responder
+(`Discovery/MdnsResponder`), so the iPhone discovers the laptop over the LAN
+without a fixed IP. Discovery is a convenience, never a trust signal: pairing
+establishes trust, and BLE (Phase 6) is proximity-only.
 
 ## 6. BLE Proximity
 
@@ -213,7 +222,7 @@ Winlogon-bypass approach will be shipped.
 | 2 | Windows service + authenticated local API + lock |
 | 3 | Secure pairing |
 | 4 | Challenge-response authentication |
-| 5 | iPhone application |
+| 5 | iPhone application (SwiftUI, discovery, pairing, Face ID, lock) |
 | 6 | BLE proximity |
 | 7 | Automatic lock |
 | 8 | Windows unlock research / extension point |

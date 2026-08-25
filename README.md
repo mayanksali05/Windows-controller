@@ -49,9 +49,11 @@ See `docs/setup.md`.
 
 ## 5. iPhone Setup
 
-See `docs/setup.md` for required capabilities (Bluetooth, Local Network, Face ID,
-Keychain). Open `iphone/` in Xcode and run on a real device (BLE + Face ID do
-not work on the simulator).
+See `docs/setup.md` §2 and `iphone/README.md`. The app is a SwiftUI/iOS 17
+project generated with XcodeGen (`xcodegen generate` in `iphone/`). Required
+capabilities: Local Network, Camera (QR pairing), Face ID, Keychain, and
+Bluetooth Always (BLE proximity). Run on a real device — BLE and Face ID do not
+work on the simulator.
 
 ## 6. Development Setup
 
@@ -144,7 +146,7 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 2. ✅ Windows service + authenticated API + lock
 3. ✅ Secure pairing
 4. ✅ Challenge-response authentication
-5. ⬜ iPhone application
+5. ✅ iPhone application (SwiftUI — builds on macOS/Xcode)
 6. ⬜ BLE proximity
 7. ⬜ Automatic lock
 8. ⬜ Windows unlock research / extension point

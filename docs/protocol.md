@@ -19,9 +19,11 @@ Success responses use:
 
 ## 1. Discovery
 
-- Windows advertises `_mywinlock._tcp` via Bonjour/mDNS on the LAN.
-- The iPhone resolves the service to an IP:port, then performs pairing (below)
-  before trusting anything.
+- Windows advertises `_mywinlock._tcp` via Bonjour/mDNS (a dependency-free
+  mDNS responder on the service) on the LAN. The TXT record carries the device
+  id.
+- The iPhone resolves the service to an IP:port via `NWBrowser`, then performs
+  pairing (below) before trusting anything.
 - Discovery alone grants nothing.
 
 ## 2. Pairing
@@ -47,13 +49,16 @@ Returns the full QR payload including the one-time token:
     "pairing_nonce": "<base64url>",
     "pairing_token": "<one-time-token>",
     "expires_at": "<ISO8601>",
-    "signature": "<base64url sig over device_id | nonce>"
+    "signature": "<base64url sig over device_id | nonce>",
+    "tls_pin": "<base64url SHA-256 of TLS leaf certificate (DER)>"
   }
 }
 ```
 
 The tray renders this as a QR code on the screen. The `signature` lets the
 iPhone verify that whoever produced the payload holds the Windows private key.
+The `tls_pin` lets the iPhone pin TLS **before** its first connection to the
+laptop, so pairing never relies on trusting arbitrary certificates.
 
 ### 2.2 Verify identity (anonymous)
 

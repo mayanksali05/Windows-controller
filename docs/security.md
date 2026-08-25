@@ -30,11 +30,14 @@
 
 - HTTPS only. Kestrel serves on a configurable port bound to the LAN interface.
 - **Development:** a locally generated development certificate is used. The
-  iPhone app only trusts a server whose certificate public key matches the pin
-  captured during pairing. `acceptAllCertificates = true` and equivalents are
+  iPhone app only trusts a server whose certificate matches the **TLS pin**
+  delivered in the pairing QR (SHA-256 of the leaf certificate DER). Pinning
+  happens *before* the first connection, so pairing never relies on trusting
+  arbitrary certificates. `acceptAllCertificates = true` and equivalents are
   forbidden everywhere.
-- **Production:** a proper certificate issued for the laptop identity, validated
-  and pinned.
+- **Production:** a proper certificate issued for the laptop identity,
+  validated and pinned (the app additionally requires the OS chain to validate
+  in production mode).
 - Development vs production is an explicit configuration value
   (`Server:Environment`), never inferred silently.
 
