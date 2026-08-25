@@ -1,0 +1,50 @@
+# .NET build output
+**/bin/
+**/obj/
+**/out/
+**/artifacts/
+*.user
+*.suo
+
+# Visual Studio
+.vs/
+*.userprefs
+*.lock.json
+
+# Xcode / iOS
+**/DerivedData/
+**/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+**/xcuserdatad/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+**/.swiftpm/
+**/build/
+
+# Certificates and private keys
+*.pfx
+*.p12
+*.key
+*.pem
+!**/dev-certs/README.md
+
+# Secrets and local configuration
+**/appsettings.Development.json
+**/appsettings.local.json
+**/.env
+**/.env.*
+*.secrets.json
+
+# Test results
+**/TestResults/
+**/coverage/
+*.trx
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local tooling
+.vscode/
+.idea/
