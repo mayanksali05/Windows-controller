@@ -184,6 +184,23 @@ recomputes the same sequence. Curve25519 refers to Ed25519 for signatures
 .NET `NSec`/BouncyCastle equivalent or `Curve25519` support as available and
 documented.
 
+## 5.5 Development-Only Token Endpoint
+
+**Phase 2 temporary mechanism, isolated from production security.**
+
+`GET /api/v1/dev/token` (anonymous, reachable only when the service runs in the
+Development environment):
+
+```json
+{ "success": true, "data": { "token": "<runtime-random-bearer-token>" } }
+```
+
+The token is generated at startup from a CSPRNG (never hardcoded), kept in
+memory, and used as `Authorization: Bearer <token>` to exercise the API until
+the challenge-response protocol (Phase 4) replaces it. Outside Development the
+service refuses to start while this is the only authentication provider
+(fail-secure).
+
 ## 6. Error Codes
 
 | Code | Meaning |

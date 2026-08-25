@@ -127,6 +127,7 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 
 ```
 /iphone       iOS app
+/windows/WinLock.Protocol  shared protocol models + error codes
 /windows/WinLock.Service   background service
 /windows/WinLock.Tray      tray/status app
 /tests        .NET tests
@@ -137,7 +138,7 @@ not faked, and no Windows-auth bypass is shipped. See `docs/architecture.md` §8
 ## Phases
 
 1. ✅ Repository + architecture
-2. ⬜ Windows service + authenticated API + lock
+2. ✅ Windows service + authenticated API + lock
 3. ⬜ Secure pairing
 4. ⬜ Challenge-response authentication
 5. ⬜ iPhone application

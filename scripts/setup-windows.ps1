@@ -30,7 +30,8 @@ if (-not $cert) {
     $cert = New-SelfSignedCertificate -DnsName 'WinLock-Development' `
         -CertStoreLocation 'Cert:\CurrentUser\My' `
         -KeyExportPolicy 'Exportable' `
-        -KeyAlgorithm 'ECDSA_P256' `
+        -KeyAlgorithm 'RSA' `
+        -KeyLength 2048 `
         -HashAlgorithm 'SHA256' `
         -NotAfter (Get-Date).AddYears(2)
 }
@@ -41,9 +42,14 @@ $ruleName = 'WinLock Service (LAN)'
 $existing = Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue
 if (-not $existing) {
     Write-Host "Creating firewall rule '$ruleName' for port $Port..."
-    New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow `
-        -Protocol TCP -LocalPort $Port `
-        -RemoteAddress 'LocalSubnet' -Profile Private,Domain | Out-Null
+    try {
+        New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow `
+            -Protocol TCP -LocalPort $Port `
+            -RemoteAddress 'LocalSubnet' -Profile Private,Domain -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Warning "Could not create the firewall rule (requires an elevated PowerShell)."
+        Write-Warning "Run setup-windows.ps1 from an elevated shell to allow LAN access, or create the rule manually for TCP $Port (LocalSubnet)."
+    }
 } else {
     Write-Host "Firewall rule '$ruleName' already exists."
 }

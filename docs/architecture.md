@@ -40,6 +40,12 @@ A background service (.NET 8, ASP.NET Core / Kestrel) that:
   pairing, settings, and log viewing. The tray app communicates with the service
   over a local loopback channel; it holds no secrets.
 
+**Locking context note:** `LockWorkStation` only affects the interactive
+session. In development the service runs in the console (interactive session)
+and can lock directly. If installed as a Windows Service (Session 0), the
+service cannot lock the user's desktop directly; the interactive tray/companion
+app is the locking host. The status payload reports `lockAvailable` accordingly.
+
 ### 2.2 iPhone App (`iphone/`)
 
 A SwiftUI app (iOS 17+) that provides:
@@ -72,11 +78,13 @@ A SwiftUI app (iOS 17+) that provides:
 | POST   | `/auth/verify`   | Yes (fresh)   | Verify signed challenge, issue session|
 | POST   | `/lock`          | Yes           | Lock workstation                     |
 | GET    | `/proximity`     | Yes           | Current proximity state               |
-| POST   | `/unpair`        | Yes           | Remove a paired device                |
+| POST    | `/unpair`        | Yes           | Remove a paired device                |
+| GET     | `/dev/token`     | Dev only*     | Runtime dev bearer token (Phase 2)    |
 
 `*` Pairing/auth endpoints are unauthenticated by design (no key yet) but are
 bound to single-use nonces and one-time pairing tokens generated locally by the
-Windows service (never a fixed password).
+Windows service (never a fixed password). The dev token endpoint is a Phase 2
+temporary mechanism, reachable only in Development, replaced by Phase 4.
 
 ## 4. Authentication
 
