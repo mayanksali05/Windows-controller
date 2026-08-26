@@ -21,6 +21,23 @@
 **/.swiftpm/
 **/build/
 
+# Expo / React Native
+**/node_modules/
+**/.expo/
+**/dist/
+**/web-build/
+*.orig.*
+**/ios/
+**/android/
+!**/modules/*/ios/
+!**/modules/*/ios/**
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+web-build/
+
 # Certificates and private keys
 *.pfx
 *.p12

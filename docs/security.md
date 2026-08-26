@@ -24,11 +24,13 @@
 - Authorized iPhone public keys stored in a DPAPI-protected key-value store.
 - Device identifiers and configuration secrets likewise DPAPI-protected.
 
-### iPhone (Keychain)
+### iPhone (Expo app — iOS Keychain via expo-secure-store)
 
-- iPhone identity key pair generated during pairing, stored in Keychain with
-  `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
-- Windows public key + TLS certificate public key (pin) stored in Keychain.
+- iPhone identity key pair generated during pairing, stored with
+  `expo-secure-store` (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`),
+  never AsyncStorage or plaintext files.
+- Windows public key + TLS pin stored in the Keychain via `expo-secure-store`.
+- Non-secret laptop metadata (host, port, name) lives in AsyncStorage.
 
 ## 3. Transport Security (TLS)
 
@@ -38,7 +40,9 @@
   delivered in the pairing QR (SHA-256 of the leaf certificate DER). Pinning
   happens *before* the first connection, so pairing never relies on trusting
   arbitrary certificates. `acceptAllCertificates = true` and equivalents are
-  forbidden everywhere.
+  forbidden everywhere. On the Expo client, pinning is enforced by the local
+  native module `winlock-networking` (NSURLSession delegate), since React
+  Native's `fetch` cannot evaluate server trust.
 - **Production:** a proper certificate issued for the laptop identity,
   validated and pinned (the app additionally requires the OS chain to validate
   in production mode).
@@ -56,7 +60,9 @@ See `protocol.md` for messages. Security-relevant properties:
 - Single-use replay cache: a consumed challenge is rejected.
 - Signatures over `device_id ‖ challenge ‖ timestamp ‖ target_endpoint`
   (Ed25519, deterministic).
-- Face ID (`LAContext`) gates the signing operation on the iPhone.
+- Face ID (`expo-local-authentication`) gates privileged actions — an explicit
+  gate before lock, pairing confirmation, and unpairing, plus the challenge
+  signing inside the authentication flow.
 - Sessions: after `/auth/verify` the service returns a short-lived HMAC-SHA256
   signed token (`Security:SessionLifetimeMinutes`) whose signing key lives in
   memory for the process lifetime (sessions end on restart). Every privileged

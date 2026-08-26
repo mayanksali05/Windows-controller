@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "WinLock",
+    "slug": "winlock",
+    "version": "0.5.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b1220"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.winlock.app",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "WinLock discovers your Windows laptop on the local network and sends encrypted commands to it.",
+        "NSCameraUsageDescription": "WinLock scans the pairing QR code shown on your Windows laptop.",
+        "NSFaceIDUsageDescription": "WinLock uses Face ID to authorize privileged actions such as locking your laptop.",
+        "NSBluetoothAlwaysUsageDescription": "WinLock advertises your presence over Bluetooth so the laptop can detect when you are nearby. Bluetooth is only a proximity signal and never grants access by itself."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "WinLock uses Face ID to authorize privileged actions."
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "WinLock scans the pairing QR code shown on your Windows laptop."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -53,13 +53,22 @@ app is the locking host. The status payload reports `lockAvailable` accordingly.
 
 ### 2.2 iPhone App (`iphone/`)
 
-A SwiftUI app (iOS 17+) that provides:
+An **Expo / React Native (TypeScript)** app (the legacy SwiftUI client remains
+in `iphone/WinLock/` for comparison). It provides:
 
-- Laptop discovery via Bonjour/mDNS (`_mywinlock._tcp`).
-- Secure pairing (QR scan, public-key exchange, Keychain storage).
-- Challenge-response authentication with Face ID via LocalAuthentication.
-- Status display, remote lock button, proximity indicator.
-- Settings for automatic locking, away timeout, BLE, security info, logs.
+- Laptop discovery via Bonjour/mDNS (`_mywinlock._tcp`), implemented in a local
+  native module (`modules/winlock-networking`) because Expo has no Bonjour API.
+- TLS-pinned HTTPS via the same native module (React Native `fetch` cannot do
+  custom trust evaluation); pinning happens before the first connection using
+  the pin from the pairing QR.
+- Secure pairing (QR scan via `expo-camera`, Ed25519 via `@noble/ed25519`,
+  `expo-secure-store` for keys).
+- Challenge-response authentication with Face ID via `expo-local-authentication`.
+- BLE proximity advertising via a local native module
+  (`modules/winlock-bluetooth`, CoreBluetooth); proximity is read back from the
+  Windows service (the laptop scans).
+- Status display, remote lock button, proximity indicator, settings, and a
+  local security-event log.
 
 ## 3. Communication
 
@@ -236,12 +245,12 @@ Winlogon-bypass approach is shipped.
 ## 9. Repository Layout
 
 ```
-/iphone                  iOS app (SwiftUI)
+/iphone                  iOS client (Expo / React Native; legacy SwiftUI in iphone/WinLock)
 /windows/WinLock.Service Windows background service
 /windows/WinLock.Tray    Tray/status application
 /tests/Windows.Tests     .NET unit tests (security-critical paths)
 /tests/Protocol.Tests    Cross-cutting protocol tests
-/docs                    architecture, security, protocol, setup, threat model
+/docs                    architecture, security, protocol, setup, threat model, windows-unlock
 /scripts                 build/setup/run/test scripts
 ```
 

@@ -1,80 +1,73 @@
-# WinLock iOS App
+# WinLock iOS Client
 
-SwiftUI app (iOS 17+) for securely controlling a Windows laptop running the
-`WinLock.Service`.
+An **Expo (SDK 54) / React Native (TypeScript)** client for securely controlling
+a Windows laptop running `WinLock.Service`. It is the current client; the legacy
+SwiftUI app is preserved in `WinLock/` for comparison.
 
 ## Requirements
 
-- macOS with **Xcode 15+** and the iOS 17 SDK.
-- **XcodeGen** (recommended) to generate the Xcode project from `project.yml`:
-  `brew install xcodegen`. Alternatively create the project manually (see
-  `docs/setup.md` → iPhone setup).
-- A real iPhone for pairing, Bluetooth, and Face ID (the simulator cannot
-  provide BLE or Face ID).
+- macOS with **Xcode 15+** for building the iOS app (development builds —
+  **Expo Go is not supported** because the app ships two local native modules).
+- A physical iPhone for pairing, Face ID, and Bluetooth.
+- An Expo account for `eas build`.
 
-## Generate and build
+## Install & typecheck
 
 ```bash
 cd iphone
-xcodegen generate          # creates WinLock.xcodeproj
-open WinLock.xcodeproj
+npm install
+npx tsc --noEmit        # typecheck
+npx jest                # unit tests (protocol, crypto, auth, pairing)
 ```
 
-In Xcode:
+## Build & run on a physical iPhone
 
-1. Select the **WinLock** scheme and a device target.
-2. Set your **Team** under Signing & Capabilities (a personal Apple ID is
-   enough; the app uses Face ID and a Keychain access group).
-3. Run on a real device.
+```bash
+eas build --platform ios --profile development   # development build
+# install the built .ipa on the iPhone, then:
+npx expo start --dev-client                       # scan the QR, run in the dev client
+```
 
-## What the app does
+Local iOS module changes require a new development build (`eas build`).
 
-- Discovers WinLock laptops over **Bonjour** (`_mywinlock._tcp`).
-- **Pairs** by scanning the QR code shown on the Windows laptop (tray → Pair
-  new device). The QR carries the Windows device id, public key, one-time
-  pairing token/nonce, a signature, and the **TLS pin**.
-- Stores the iPhone identity private key in the **Keychain** (Ed25519 via
-  CryptoKit) and pins the laptop's TLS certificate to the exact certificate
-  seen at pairing.
-- Authenticates with **Face ID + challenge-response** and a short-lived session
-  token; every privileged action (lock, status, unpair) requires it.
-- Shows laptop status (locked state, battery, proximity, security) and a
-  **LOCK** button.
-
-## Required capabilities
-
-Declared in `Info.plist` / `WinLock.entitlements`:
-
-| Capability | Why |
-|------------|-----|
-| Local Network (`NSLocalNetworkUsageDescription`) | Bonjour discovery and HTTPS to the laptop |
-| Camera (`NSCameraUsageDescription`) | QR pairing |
-| Face ID (`NSFaceIDUsageDescription`) | Gate privileged actions via `LocalAuthentication` |
-| Bluetooth Always (`NSBluetoothAlwaysUsageDescription`) | BLE proximity (used in a later phase; declared now) |
-| Keychain access group | Store keys/pins in the Keychain |
-| Background modes: bluetooth-central/peripheral | Keep BLE proximity working in the background (later phase) |
-
-No other permissions are requested.
-
-## Security notes
-
-- Private keys live only in the Keychain
-  (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`).
-- TLS is pinned; the app never accepts arbitrary certificates
-  (`ServerTrustPinner` compares the leaf certificate DER hash to the pairing
-  pin).
-- BLE presence is a proximity signal only and never authorizes anything.
-
-## Layout
+## Project layout
 
 ```
-project.yml                      XcodeGen project definition
-WinLock/
-  App/          app entry + service container
-  Models/       protocol DTOs
-  Networking/   APIClient (TLS pinned), Bonjour discovery
-  Security/     CryptoKit keys, Keychain, Base64URL, canonical strings, Face ID
-  Storage/      paired-laptop metadata + local security log
-  ViewModels/   list, detail, pairing
-  Views/        SwiftUI screens
+app/                      expo-router screens (list, laptop/[id], pair, settings, logs)
+src/
+  api/        typed WindowsApiClient (pinned HTTPS, retries, 401 re-auth)
+  auth/       Face ID gate, session, authentication service
+  bluetooth/  platform-independent BLE service + proximity state
+  crypto/     base64url, sha, ed25519 (@noble), protocolStrings, proximityUuid, identity
+  discovery/  Bonjour service (native module events)
+  pairing/    pairing service (payload verify + signed confirm + persist)
+  services/   app container, lock/status/settings/log/proximity services
+  storage/    expo-secure-store (keys/pins) + AsyncStorage (metadata)
+  hooks/      useLaptops, useLaptopDetail, useProximity, useLogs
+  native/     TS bindings for the native modules
+  types/      protocol DTOs + error codes
+  utils/      hex, time helpers
+modules/
+  winlock-networking/   Swift expo module: pinned HTTPS (NSURLSession) + Bonjour
+  winlock-bluetooth/    Swift expo module: CoreBluetooth proximity advertising
+assets/                 app icons
+app.json  eas.json  package.json  tsconfig.json  jest.config.js
 ```
+
+## Security
+
+- Ed25519 (RFC 8032) keys/signatures interoperable with the Windows service;
+  the iPhone identity seed, Windows public keys, and TLS pins live only in
+  `expo-secure-store` (iOS Keychain). Never AsyncStorage.
+- TLS is pinned to the exact certificate from the pairing QR (native module),
+  before the first connection; arbitrary certificates are never accepted.
+- Face ID (`expo-local-authentication`) gates lock, pairing confirmation, and
+  unpairing, plus the challenge signing inside authentication.
+- BLE is a proximity signal only and never authenticates.
+- Windows unlock is an extension point and is **not** implemented.
+
+## Required permissions (app.json)
+
+Local Network, Camera (QR pairing), Face ID, Bluetooth Always (advertising), and
+Keychain (secure-store). Background Bluetooth modes are declared for proximity
+advertising.

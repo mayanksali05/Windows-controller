@@ -17,8 +17,9 @@ Two components:
   local HTTPS API, secure pairing, challenge-response auth, `LockWorkStation`
   locking, BLE proximity scanning, automatic lock, structured security logging,
   plus a **WinLock.Tray** app.
-- **`iphone/` — SwiftUI app (iOS 17+)** — discovery (Bonjour), QR pairing,
-  Face ID + CryptoKit signatures, status, lock button, proximity, settings, logs.
+- **`iphone/` — Expo / React Native (TypeScript) client** — Bonjour discovery,
+  QR pairing, Face ID, challenge-response auth, status, lock button, proximity,
+  settings, logs (legacy SwiftUI client preserved in `iphone/WinLock/`).
 
 ## 2. Architecture
 
@@ -49,11 +50,21 @@ See `docs/setup.md`.
 
 ## 5. iPhone Setup
 
-See `docs/setup.md` §2 and `iphone/README.md`. The app is a SwiftUI/iOS 17
-project generated with XcodeGen (`xcodegen generate` in `iphone/`). Required
-capabilities: Local Network, Camera (QR pairing), Face ID, Keychain, and
-Bluetooth Always (BLE proximity). Run on a real device — BLE and Face ID do not
-work on the simulator.
+See `docs/setup.md` §2 and `iphone/README.md`. The client is an **Expo SDK 54 /
+React Native (TypeScript)** app in `iphone/` using development builds (two local
+native modules provide TLS-pinned HTTPS + Bonjour discovery, and CoreBluetooth
+BLE advertising). The legacy SwiftUI client is preserved under `iphone/WinLock/`
+for comparison.
+
+```bash
+cd iphone
+npm install
+eas build --platform ios --profile development
+```
+
+Required capabilities: Local Network, Camera (QR pairing), Face ID (via
+`expo-local-authentication`), Keychain (`expo-secure-store`), and Bluetooth
+Always (BLE advertising). Run on a real device.
 
 ## 6. Development Setup
 
@@ -119,6 +130,8 @@ See `docs/protocol.md`. Summary:
 
 ## 11. Testing
 
+Windows/.NET:
+
 ```powershell
 .\scripts\run-tests.ps1
 ```
@@ -127,6 +140,14 @@ Security tests: invalid signatures, expired/replayed challenges, unknown
 devices, malformed requests, unauthorized lock, pairing failures.
 API tests: auth success/failure, lock, status, pair, unpair.
 Windows tests: lock invocation, service lifecycle, config, secure storage.
+
+Expo client:
+
+```bash
+cd iphone
+npx jest            # 36 unit tests (protocol, auth, pairing, crypto)
+npx tsc --noEmit    # typecheck
+```
 
 ## 12. Troubleshooting
 
@@ -176,7 +197,7 @@ authentication weakening is shipped.
 2. ✅ Windows service + authenticated API + lock
 3. ✅ Secure pairing
 4. ✅ Challenge-response authentication
-5. ✅ iPhone application (SwiftUI — builds on macOS/Xcode)
+5. ✅ iPhone application (Expo / React Native — TS verified, iOS build on macOS)
 6. ✅ BLE proximity
 7. ✅ Automatic lock
 8. ✅ Windows unlock research / extension point

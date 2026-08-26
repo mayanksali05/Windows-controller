@@ -4,6 +4,13 @@ Versioned protocol for iPhone ⇄ Windows Companion Service communication.
 
 Base URL: `https://<laptop>:<port>/api/v1`
 
+> **Wire format note:** the JSON keys on the wire are **camelCase**
+> (`challengeId`, `sessionToken`, `windowsPublicKey`, `tlsPin`, …), because the
+> Windows service uses ASP.NET Core's default camelCase serializer and the QR
+> payload is serialized with `JsonSerializerDefaults.Web`. The examples below
+> use snake_case for readability; clients must send/receive camelCase. The
+> Expo/React Native client implements the camelCase wire.
+
 All requests/responses are JSON over TLS. All failures use the structured error
 shape:
 
