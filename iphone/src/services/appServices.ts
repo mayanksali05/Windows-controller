@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import type { WindowsApiClient } from '../api/windowsApiClient';
 import { WindowsApiClient as ApiClientImpl } from '../api/windowsApiClient';
 import type { DeviceIdentity } from '../crypto/identity';
@@ -7,7 +8,7 @@ import { bluetoothService, type BluetoothService } from '../bluetooth/bluetoothS
 import { bonjourService, type DiscoveryService } from '../discovery/bonjourService';
 import { PairingService } from '../pairing/pairingService';
 import { createLogStore, type LogStore } from './logStore';
-import { getTlsPin } from '../storage/laptopStore';
+import { getTlsPin, loadLaptops, addLaptop } from '../storage/laptopStore';
 import type { PairedLaptop } from '../types/protocol';
 
 export interface AppServices {
@@ -29,6 +30,23 @@ export interface AppServices {
 export async function createAppServices(onEvent?: (kind: string, message: string) => void): Promise<AppServices> {
   const identity = await loadOrCreateIdentity();
   const logStore = createLogStore();
+
+  // WEB PREVIEW ONLY: seed a clearly-labeled demo laptop so the list/detail UI
+  // can be inspected in a browser. Never runs on iOS and never touches a real
+  // laptop (TEST-NET address, no TLS pin, so all network calls fail cleanly).
+  if (Platform.OS === 'web') {
+    const existing = await loadLaptops();
+    if (!existing.some((l) => l.deviceId === 'DEMO-WEB-PREVIEW')) {
+      await addLaptop({
+        deviceId: 'DEMO-WEB-PREVIEW',
+        name: 'Demo Laptop (web preview)',
+        host: '192.0.2.1',
+        port: 8765,
+        pairedAt: new Date().toISOString(),
+      });
+      logStore.add('DEMO', 'Web preview: seeded a demo laptop (no real backend).');
+    }
+  }
 
   const pairing = new PairingService(
     identity,

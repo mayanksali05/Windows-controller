@@ -1,4 +1,5 @@
 import * as LocalAuthentication from 'expo-local-authentication';
+import { Platform } from 'react-native';
 import { FaceIdCancelledError, FaceIdError } from '../api/errors';
 
 export interface FaceIdGate {
@@ -10,9 +11,15 @@ export interface FaceIdGate {
  * Face ID gate using expo-local-authentication. Falls back to the device
  * passcode where appropriate. Handles success, failure, cancellation,
  * unavailable hardware/biometrics, and passcode fallback.
+ *
+ * On web (preview only) there is no biometric prompt, so the gate is skipped.
  */
 export const faceIdGate: FaceIdGate = {
   async require(reason: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      return; // web preview only
+    }
+
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 

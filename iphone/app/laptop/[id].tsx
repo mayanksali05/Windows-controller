@@ -66,8 +66,8 @@ export default function LaptopDetailScreen() {
       </View>
 
       <Pressable
-        style={[styles.lockButton, detail.isLocking && styles.lockButtonDisabled]}
-        disabled={detail.isLocking}
+        style={[styles.lockButton, (detail.isLocking || !client) && styles.lockButtonDisabled]}
+        disabled={detail.isLocking || !client}
         onPress={() => void detail.lock()}
       >
         <Text style={styles.lockButtonText}>{detail.isLocking ? 'LOCKING…' : '🔒 LOCK LAPTOP'}</Text>
@@ -84,7 +84,15 @@ export default function LaptopDetailScreen() {
         <Stat label="Auth" value={detail.authenticated ? 'Authenticated' : 'Not signed in'} />
       </View>
 
-      <Pressable style={styles.dangerButton} onPress={() => void services.pairing.unpair(laptop.deviceId, client!)}>
+      <Pressable
+        style={[styles.dangerButton, !client && styles.dangerButtonDisabled]}
+        disabled={!client}
+        onPress={() => {
+          if (client) {
+            void services.pairing.unpair(laptop.deviceId, client);
+          }
+        }}
+      >
         <Text style={styles.dangerText}>Unpair</Text>
       </Pressable>
     </ScrollView>
@@ -134,5 +142,6 @@ const styles = StyleSheet.create({
   statValue: { color: '#e6f1ff', fontSize: 16, fontWeight: '600', marginTop: 4 },
   statAccent: { color: '#30d158' },
   dangerButton: { backgroundColor: '#2a1a1c', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  dangerButtonDisabled: { opacity: 0.4 },
   dangerText: { color: '#ff6961', fontWeight: '600' },
 });

@@ -1,7 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
 import { randomSeed, getPublicKey, createSigner, type Signer } from './ed25519';
 import { sha256 } from './sha';
 import { bytesToHex } from '../utils/hex';
+import { secureGet, secureSet, SECURE_KEYS } from '../storage/secureStore';
 
 /**
  * The iPhone identity: an Ed25519 key pair stored in the iOS Keychain via
@@ -10,7 +10,7 @@ import { bytesToHex } from '../utils/hex';
  * bound to the key, mirroring the Windows laptop identity scheme.
  */
 
-const PRIVATE_KEY_STORE_KEY = 'winlock.identity.seed';
+const PRIVATE_KEY_STORE_KEY = SECURE_KEYS.identitySeed;
 
 export interface DeviceIdentity {
   deviceId: string;
@@ -24,7 +24,7 @@ function deriveDeviceId(publicKeyBytes: Uint8Array): string {
 
 /** Load the existing identity or create and persist a fresh one. */
 export async function loadOrCreateIdentity(): Promise<DeviceIdentity> {
-  const stored = await SecureStore.getItemAsync(PRIVATE_KEY_STORE_KEY);
+  const stored = await secureGet(PRIVATE_KEY_STORE_KEY);
   if (stored) {
     const seed = decodeSeed(stored);
     const signer = createSigner(seed);
@@ -32,7 +32,7 @@ export async function loadOrCreateIdentity(): Promise<DeviceIdentity> {
   }
 
   const seed = await randomSeed();
-  await SecureStore.setItemAsync(PRIVATE_KEY_STORE_KEY, encodeSeed(seed));
+  await secureSet(PRIVATE_KEY_STORE_KEY, encodeSeed(seed));
   const signer = createSigner(seed);
   return { deviceId: deriveDeviceId(signer.publicKeyBytes), signer };
 }
