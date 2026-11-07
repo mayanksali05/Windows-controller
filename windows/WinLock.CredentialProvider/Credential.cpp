@@ -1,6 +1,7 @@
 #include "Credential.h"
 #include "helpers.h"
 #include "resource.h"
+#include "log.h"
 
 namespace
 {
@@ -95,6 +96,7 @@ IFACEMETHODIMP WinLockCredential::QueryInterface(REFIID riid, void** ppv)
         AddRef();
         return S_OK;
     }
+    WinLockLogGuid(L"Credential::QueryInterface: not supported", riid);
     *ppv = nullptr;
     return E_NOINTERFACE;
 }
@@ -141,6 +143,7 @@ IFACEMETHODIMP WinLockCredential::UnAdvise()
 IFACEMETHODIMP WinLockCredential::SetSelected(BOOL* autoLogon)
 {
     *autoLogon = _state->HasPendingFor(_user.sid) ? TRUE : FALSE;
+    WinLockLog(L"Credential::SetSelected autoLogon=%d", *autoLogon);
     return S_OK;
 }
 
@@ -212,8 +215,11 @@ IFACEMETHODIMP WinLockCredential::GetBitmapValue(DWORD fieldId, HBITMAP* bitmap)
     HBITMAP loaded = LoadBitmapW(g_hinst, MAKEINTRESOURCEW(IDB_TILE_IMAGE));
     if (!loaded)
     {
-        return HRESULT_FROM_WIN32(GetLastError());
+        HRESULT hr = HRESULT_FROM_WIN32(GetLastError());
+        WinLockLog(L"Credential::GetBitmapValue LoadBitmap failed hr=0x%08X", hr);
+        return hr;
     }
+    WinLockLog(L"Credential::GetBitmapValue ok");
     *bitmap = loaded;
     return S_OK;
 }
@@ -299,6 +305,7 @@ IFACEMETHODIMP WinLockCredential::GetSerialization(
     std::wstring password;
     if (!_state->TakePassword(_user.sid, password))
     {
+        WinLockLog(L"Credential::GetSerialization: no pending iPhone request");
         // Tile clicked by hand without a pending iPhone request.
         SHStrDupW(kWaiting, optionalStatusText);
         return S_OK;
@@ -408,6 +415,8 @@ IFACEMETHODIMP WinLockCredential::GetSerialization(
         *response = CPGSR_NO_CREDENTIAL_NOT_FINISHED;
         _state->FailHandoff(_user.sid);
     }
+    WinLockLog(L"Credential::GetSerialization local=%d hr=0x%08X response=%d",
+        _user.isLocal ? 1 : 0, hr, static_cast<int>(*response));
     return hr;
 }
 
@@ -427,6 +436,7 @@ IFACEMETHODIMP WinLockCredential::ReportResult(
     }
 
     bool ours = _state->ReportResult(_user.sid, status);
+    WinLockLog(L"Credential::ReportResult status=0x%08X ours=%d", static_cast<unsigned>(status), ours ? 1 : 0);
     if (ours && !NT_SUCCESS(status) && optionalStatusText && optionalStatusIcon)
     {
         if (SUCCEEDED(SHStrDupW(kRejected, optionalStatusText)))

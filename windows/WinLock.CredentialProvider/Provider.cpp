@@ -1,5 +1,6 @@
 #include "Provider.h"
 #include "helpers.h"
+#include "log.h"
 
 namespace
 {
@@ -64,6 +65,7 @@ IFACEMETHODIMP WinLockProvider::QueryInterface(REFIID riid, void** ppv)
     }
     else
     {
+        WinLockLogGuid(L"Provider::QueryInterface: not supported", riid);
         *ppv = nullptr;
         return E_NOINTERFACE;
     }
@@ -86,8 +88,10 @@ IFACEMETHODIMP_(ULONG) WinLockProvider::Release()
     return count;
 }
 
-IFACEMETHODIMP WinLockProvider::SetUsageScenario(CREDENTIAL_PROVIDER_USAGE_SCENARIO scenario, DWORD)
+IFACEMETHODIMP WinLockProvider::SetUsageScenario(CREDENTIAL_PROVIDER_USAGE_SCENARIO scenario, DWORD flags)
 {
+    WinLockLog(L"Provider::SetUsageScenario cpus=%d flags=0x%X (unlock=%d)", static_cast<int>(scenario), flags,
+        static_cast<int>(CPUS_UNLOCK_WORKSTATION));
     // Unlock only. Initial sign-in, CredUI prompts, and password changes are
     // left entirely to Windows' own providers.
     if (scenario != CPUS_UNLOCK_WORKSTATION)
@@ -106,12 +110,14 @@ IFACEMETHODIMP WinLockProvider::SetSerialization(const CREDENTIAL_PROVIDER_CREDE
 
 IFACEMETHODIMP WinLockProvider::Advise(ICredentialProviderEvents* events, UINT_PTR adviseContext)
 {
+    WinLockLog(L"Provider::Advise events=%p", static_cast<void*>(events));
     _state->SetEvents(events, adviseContext);
     return S_OK;
 }
 
 IFACEMETHODIMP WinLockProvider::UnAdvise()
 {
+    WinLockLog(L"Provider::UnAdvise");
     _state->SetEvents(nullptr, 0);
     return S_OK;
 }
@@ -139,7 +145,9 @@ IFACEMETHODIMP WinLockProvider::GetFieldDescriptorAt(DWORD index, CREDENTIAL_PRO
     {
         return E_INVALIDARG;
     }
-    return FieldDescriptorCoAllocCopy(field, descriptor);
+    HRESULT hr = FieldDescriptorCoAllocCopy(field, descriptor);
+    WinLockLog(L"Provider::GetFieldDescriptorAt %lu hr=0x%08X", index, hr);
+    return hr;
 }
 
 IFACEMETHODIMP WinLockProvider::GetCredentialCount(DWORD* count, DWORD* defaultIndex, BOOL* autoLogonWithDefault)
@@ -164,6 +172,8 @@ IFACEMETHODIMP WinLockProvider::GetCredentialCount(DWORD* count, DWORD* defaultI
             break;
         }
     }
+    WinLockLog(L"Provider::GetCredentialCount count=%lu default=%ld autoLogon=%d",
+        *count, static_cast<long>(*defaultIndex), *autoLogonWithDefault);
     return S_OK;
 }
 
@@ -193,6 +203,7 @@ IFACEMETHODIMP WinLockProvider::SetUserArray(ICredentialProviderUserArray* users
 
     DWORD userCount = 0;
     HRESULT hr = users->GetCount(&userCount);
+    WinLockLog(L"Provider::SetUserArray GetCount hr=0x%08X count=%lu", hr, userCount);
     if (FAILED(hr))
     {
         return hr;
@@ -213,9 +224,13 @@ IFACEMETHODIMP WinLockProvider::SetUserArray(ICredentialProviderUserArray* users
             PWSTR sid = nullptr;
             PWSTR qualifiedName = nullptr;
             GUID providerId = GUID_NULL;
-            if (SUCCEEDED(user->GetSid(&sid)) &&
-                SUCCEEDED(user->GetStringValue(PKEY_Identity_QualifiedUserName, &qualifiedName)) &&
-                sid && qualifiedName)
+            HRESULT sidHr = user->GetSid(&sid);
+            HRESULT nameHr = SUCCEEDED(sidHr)
+                ? user->GetStringValue(PKEY_Identity_QualifiedUserName, &qualifiedName)
+                : E_FAIL;
+            WinLockLog(L"Provider::SetUserArray user %lu sid=%s sidHr=0x%08X nameHr=0x%08X",
+                i, sid ? sid : L"(null)", sidHr, nameHr);
+            if (SUCCEEDED(sidHr) && SUCCEEDED(nameHr) && sid && qualifiedName)
             {
                 entry.sid = sid;
                 entry.qualifiedName = qualifiedName;
@@ -243,6 +258,7 @@ IFACEMETHODIMP WinLockProvider::SetUserArray(ICredentialProviderUserArray* users
         return E_OUTOFMEMORY;
     }
 
+    WinLockLog(L"Provider::SetUserArray created %u credential(s)", static_cast<unsigned>(_credentials.size()));
     _state->SetUsers(std::move(lockedUsers));
     return S_OK;
 }

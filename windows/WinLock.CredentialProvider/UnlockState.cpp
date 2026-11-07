@@ -1,4 +1,5 @@
 #include "UnlockState.h"
+#include "log.h"
 
 namespace
 {
@@ -153,6 +154,7 @@ void UnlockState::RunPipeServer()
     }
 
     SECURITY_ATTRIBUTES attributes = { sizeof(attributes), descriptor, FALSE };
+    WinLockLog(L"Pipe: server thread started");
     HANDLE ioEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
 
     while (ioEvent && WaitForSingleObject(_stopEvent, 0) != WAIT_OBJECT_0)
@@ -165,6 +167,7 @@ void UnlockState::RunPipeServer()
 
         if (pipe == INVALID_HANDLE_VALUE)
         {
+            WinLockLog(L"Pipe: CreateNamedPipe failed error=%lu", GetLastError());
             // Another instance owns the name (or a transient failure); retry later.
             WaitForSingleObject(_stopEvent, 2000);
             continue;
@@ -330,8 +333,10 @@ void UnlockState::HandleClient(HANDLE pipe)
     std::wstring password;
     std::wstring clientSid;
 
+    WinLockLog(L"Pipe: client connected");
     if (!ReadRequest(pipe, password) || !GetClientSid(pipe, clientSid))
     {
+        WinLockLog(L"Pipe: bad request");
         SecureClear(password);
         WriteResponse(pipe, UNLOCK_RESULT_BAD_REQUEST, 0);
         return;
@@ -340,6 +345,8 @@ void UnlockState::HandleClient(HANDLE pipe)
     NTSTATUS status = 0;
     UnlockResultCode code = Submit(clientSid, password, status);
     SecureClear(password);
+    WinLockLog(L"Pipe: request from %s -> code=%d status=0x%08X", clientSid.c_str(),
+        static_cast<int>(code), static_cast<unsigned>(status));
     WriteResponse(pipe, code, status);
 }
 

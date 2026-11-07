@@ -1,6 +1,7 @@
 // COM plumbing for the WinLock credential provider DLL.
 #include <initguid.h>
 #include "Provider.h"
+#include "log.h"
 
 HINSTANCE g_hinst = nullptr;
 static LONG g_dllRefCount = 0;
@@ -59,7 +60,9 @@ public:
         {
             return CLASS_E_NOAGGREGATION;
         }
-        return WinLockProvider::Create(riid, ppv);
+        HRESULT hr = WinLockProvider::Create(riid, ppv);
+        WinLockLog(L"ClassFactory::CreateInstance hr=0x%08X", hr);
+        return hr;
     }
 
     IFACEMETHODIMP LockServer(BOOL lock) override
@@ -94,8 +97,10 @@ STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void** ppv)
     *ppv = nullptr;
     if (!IsEqualCLSID(rclsid, CLSID_WinLockProvider))
     {
+        WinLockLogGuid(L"DllGetClassObject: unknown CLSID", rclsid);
         return CLASS_E_CLASSNOTAVAILABLE;
     }
+    WinLockLog(L"DllGetClassObject: WinLock provider requested");
 
     auto* factory = new (std::nothrow) WinLockClassFactory();
     if (!factory)
@@ -113,6 +118,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstance, DWORD reason, LPVOID)
     {
         g_hinst = hinstance;
         DisableThreadLibraryCalls(hinstance);
+        wchar_t image[MAX_PATH] = L"?";
+        GetModuleFileNameW(nullptr, image, ARRAYSIZE(image));
+        WinLockLog(L"DLL loaded into %s", image);
     }
     return TRUE;
 }
