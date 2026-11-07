@@ -86,3 +86,10 @@ export class InvalidPairingPayloadError extends ApiClientError {
     this.name = 'InvalidPairingPayloadError';
   }
 }
+/** No Windows unlock password has been saved on this iPhone for the laptop. */
+export class UnlockPasswordMissingError extends ApiClientError {
+  constructor(message = 'Save your Windows password for this laptop first') {
+    super(message, 'ERR_UNLOCK_PASSWORD_MISSING');
+    this.name = 'UnlockPasswordMissingError';
+  }
+}

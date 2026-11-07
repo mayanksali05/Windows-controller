@@ -1,5 +1,6 @@
 using WinLock.Cryptography;
 using WinLock.Protocol.Models;
+using WinLock.Service.Authentication;
 using WinLock.Service.Bluetooth;
 using WinLock.Service.Configuration;
 using WinLock.Service.Locking;
@@ -17,6 +18,7 @@ public sealed class WindowsSystemStatusService : ISystemStatusService
     private readonly IWindowsLockService _lockService;
     private readonly AuthorizedDeviceStore _devices;
     private readonly ProximityMonitor _proximity;
+    private readonly IWindowsAuthenticationProvider _unlock;
     private readonly string _version;
     private readonly string _environment;
 
@@ -24,8 +26,10 @@ public sealed class WindowsSystemStatusService : ISystemStatusService
         IWindowsLockService lockService,
         AuthorizedDeviceStore devices,
         ProximityMonitor proximity,
+        IWindowsAuthenticationProvider unlock,
         ServerOptions serverOptions)
     {
+        _unlock = unlock;
         _lockService = lockService;
         _devices = devices;
         _proximity = proximity;
@@ -42,6 +46,7 @@ public sealed class WindowsSystemStatusService : ISystemStatusService
         ServiceVersion = _version,
         Environment = _environment,
         LockAvailable = _lockService.CanLock,
+        UnlockAvailable = _unlock.IsAvailable,
         Proximity = _proximity.CurrentState.State.ToString().ToUpperInvariant(),
         Security = _devices.Count > 0 ? "PAIRED" : "NOT_PAIRED",
     };

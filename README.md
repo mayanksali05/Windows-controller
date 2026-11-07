@@ -1,13 +1,14 @@
 # WinLock — iPhone-based Windows Lock & Secure Unlock System
 
 A secure system for controlling a Windows laptop from an iPhone over the local
-network: remote **lock**, **BLE proximity** detection, **Face-ID-backed
-cryptographic authentication**, and configurable **automatic locking**. Unlock
-is deliberately **not** implemented through any bypass; it is a documented
-extension point using supported Windows mechanisms only.
+network: remote **lock** and **unlock**, **BLE proximity** detection,
+**Face-ID-backed cryptographic authentication**, and configurable **automatic
+locking**. Unlock goes through a Windows **Credential Provider** that submits
+your real Windows password (kept on the iPhone). Windows validates it, so
+nothing is bypassed.
 
-> Security-first: no plain HTTP, no hardcoded secrets, no password handling, no
-> Windows-auth bypass. See `docs/security.md` and `docs/threat-model.md`.
+> Security-first: no plain HTTP, no hardcoded secrets, no passwords stored on
+> the laptop, no Windows-auth bypass. See `docs/security.md` and `docs/threat-model.md`.
 
 ## 1. Overview
 
@@ -56,6 +57,12 @@ native modules provide TLS-pinned HTTPS + Bonjour discovery, and CoreBluetooth
 BLE advertising). The legacy SwiftUI client is preserved under `iphone/WinLock/`
 for comparison.
 
+**No Mac (Windows + iPhone, free Apple ID):** GitHub Actions builds an unsigned
+`.ipa` (`.github/workflows/ios-unsigned-ipa.yml`); install it with Sideloadly.
+Step by step: `docs/iphone-install-windows.md`.
+
+With a paid Apple Developer account you can instead use EAS:
+
 ```bash
 cd iphone
 npm install
@@ -102,6 +109,7 @@ See `docs/protocol.md`. Summary:
 | POST   | `/api/v1/auth/challenge` | anonymous (paired device) |
 | POST   | `/api/v1/auth/verify` | single-use challenge + sig |
 | POST   | `/api/v1/lock` | session |
+| POST   | `/api/v1/unlock` | session (+ Windows password, rate limited) |
 | GET    | `/api/v1/proximity` | session |
 | GET    | `/api/v1/settings` | session |
 
@@ -134,6 +142,7 @@ Windows/.NET:
 
 ```powershell
 .\scripts\run-tests.ps1
+.\scripts\build-credential-provider.ps1   # C++ credential provider (unlock)
 ```
 
 Security tests: invalid signatures, expired/replayed challenges, unknown
@@ -145,7 +154,7 @@ Expo client:
 
 ```bash
 cd iphone
-npx jest            # 36 unit tests (protocol, auth, pairing, crypto)
+npx jest            # 46 unit tests (protocol, auth, pairing, crypto, lock/unlock)
 npx tsc --noEmit    # typecheck
 ```
 
@@ -159,24 +168,26 @@ See `docs/setup.md` §6.
 - iOS build requires a Mac.
 - Fully compromised hosts can read DPAPI-protected data (OS boundary).
 
-## 14. Windows Unlock Limitations
+## 14. Windows Unlock
 
-Unlocking a locked session requires OS-supported integration. Research
-(`docs/windows-unlock.md`) concluded:
+Unlock uses the supported lock-screen integration, a **Windows Credential
+Provider** (`windows/WinLock.CredentialProvider`, C++):
 
-- A **Windows Credential Provider** (C++ COM) is the only supported logon
-  integration point, but credential providers are not enforcement mechanisms —
-  the user's real Windows Hello gesture, PIN, or password is still required on
-  the laptop, so an iPhone could at most trigger the flow, never replace the
-  credential.
-- **Windows Hello / FIDO2 / passkeys** require the iPhone to be enrolled as a
-  Windows Hello security key — a deep, user-interactive OS enrollment outside a
-  companion service's scope.
+1. iPhone: Face ID → read the Windows password from the Keychain → `POST /api/v1/unlock`.
+2. Service → named pipe (must be owned by SYSTEM) → provider in LogonUI.
+3. The provider submits a standard unlock logon; Windows validates the password.
 
-Unlock is therefore a **documented extension point** represented by
-`IWindowsAuthenticationProvider` with **no implementation and no `/unlock`
-endpoint**. No bypass, credential fabrication, keyboard injection, or Windows
-authentication weakening is shipped.
+Setup (laptop, once):
+
+```powershell
+.\scripts\build-credential-provider.ps1          # needs VS 2022 + C++ workload
+.\scripts\install-credential-provider.ps1        # elevated
+```
+
+Then in the app: laptop → **Unlock password → Set password** (Windows account
+password, not PIN). Normal password/PIN sign-in is unchanged. Turn off with
+`-Disable`, remove with `-Uninstall`. Details, limitations, and recovery steps:
+`docs/windows-unlock.md`.
 
 ## Repository Layout
 
@@ -186,6 +197,7 @@ authentication weakening is shipped.
 /windows/WinLock.Cryptography  shared Ed25519 + DPAPI storage + identity
 /windows/WinLock.Service   background service
 /windows/WinLock.Tray      tray/status app
+/windows/WinLock.CredentialProvider  lock-screen credential provider (C++, unlock)
 /tests        .NET tests
 /docs         architecture, security, protocol, setup, threat model, windows-unlock
 /scripts      setup/build/run/test scripts
@@ -201,3 +213,4 @@ authentication weakening is shipped.
 6. ✅ BLE proximity
 7. ✅ Automatic lock
 8. ✅ Windows unlock research / extension point
+9. ✅ Remote unlock via credential provider (needs on-device verification)

@@ -54,5 +54,30 @@ if (-not $existing) {
     Write-Host "Firewall rule '$ruleName' already exists."
 }
 
+# 3. Firewall rule for mDNS (UDP 5353) so the iPhone can discover the laptop.
+#    The service answers Bonjour queries itself; without this rule Windows
+#    drops them and the app never sees the laptop (pairing needs discovery).
+$mdnsRuleName = 'WinLock Discovery mDNS (LAN)'
+$existingMdns = Get-NetFirewallRule -DisplayName $mdnsRuleName -ErrorAction SilentlyContinue
+if (-not $existingMdns) {
+    Write-Host "Creating firewall rule '$mdnsRuleName' for UDP 5353..."
+    try {
+        New-NetFirewallRule -DisplayName $mdnsRuleName -Direction Inbound -Action Allow `
+            -Protocol UDP -LocalPort 5353 `
+            -RemoteAddress 'LocalSubnet' -Profile Private,Domain -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Warning "Could not create the mDNS firewall rule (requires an elevated PowerShell)."
+        Write-Warning "Create it manually for UDP 5353 (LocalSubnet) or iPhone discovery may fail."
+    }
+} else {
+    Write-Host "Firewall rule '$mdnsRuleName' already exists."
+}
+
+$netCategory = (Get-NetConnectionProfile -ErrorAction SilentlyContinue | Select-Object -First 1).NetworkCategory
+if ($netCategory -eq 'Public') {
+    Write-Warning "Your Wi-Fi is set to 'Public'. The WinLock rules only apply on Private/Domain networks:"
+    Write-Warning "Settings -> Network & internet -> Wi-Fi -> (your network) -> Network profile type -> Private."
+}
+
 Write-Host 'Setup complete.'
 Write-Host 'Next: .\scripts\build-windows.ps1'

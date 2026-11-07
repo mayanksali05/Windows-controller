@@ -245,4 +245,73 @@ describe('WindowsApiClient', () => {
     const input = protocol.pairingSigningInput(deviceId, payload.pairingNonce);
     expect(verify(signer.publicKeyBytes, base64urlDecode(body.signature), input)).toBe(true);
   });
+
+  it('unlock sends the password over the authenticated pinned session with a long timeout', async () => {
+    const { client, requireFaceId } = makeClient();
+    pinnedRequestMock.mockImplementation(async (opts: { url: string }) => {
+      if (opts.url.endsWith('/api/v1/auth/challenge')) {
+        return { status: 200, body: JSON.stringify({ success: true, data: { challengeId: 'c1', challenge: NONCE, expiresAt: futureIso() } }) };
+      }
+      if (opts.url.endsWith('/api/v1/auth/verify')) {
+        return { status: 200, body: JSON.stringify({ success: true, data: { sessionToken: 'tok', sessionExpires: futureIso(), proximity: 'UNKNOWN' } }) };
+      }
+      if (opts.url.endsWith('/api/v1/unlock')) {
+        return { status: 200, body: JSON.stringify({ success: true, message: 'Laptop unlocked' }) };
+      }
+      throw new Error(`unexpected url ${opts.url}`);
+    });
+
+    await client.unlock('correct horse');
+
+    expect(requireFaceId).toHaveBeenCalledTimes(1);
+    const call = pinnedRequestMock.mock.calls.find((c) => c[0].url.endsWith('/api/v1/unlock'));
+    expect(call![0].method).toBe('POST');
+    expect(call![0].headers.Authorization).toBe('Bearer tok');
+    expect(call![0].pin).toBe('cGlu');
+    expect(call![0].timeoutSeconds).toBeGreaterThanOrEqual(25);
+    expect(JSON.parse(call![0].body)).toEqual({ deviceId, password: 'correct horse' });
+  });
+
+  it('unlock surfaces a rejected password as a ServerError', async () => {
+    const { client } = makeClient();
+    pinnedRequestMock.mockImplementation(async (opts: { url: string }) => {
+      if (opts.url.endsWith('/api/v1/auth/challenge')) {
+        return { status: 200, body: JSON.stringify({ success: true, data: { challengeId: 'c1', challenge: NONCE, expiresAt: futureIso() } }) };
+      }
+      if (opts.url.endsWith('/api/v1/auth/verify')) {
+        return { status: 200, body: JSON.stringify({ success: true, data: { sessionToken: 'tok', sessionExpires: futureIso(), proximity: 'UNKNOWN' } }) };
+      }
+      return {
+        status: 422,
+        body: JSON.stringify({
+          success: false,
+          error: { code: 'UNLOCK_PASSWORD_REJECTED', message: 'Windows rejected the password.' },
+        }),
+      };
+    });
+
+    await expect(client.unlock('wrong')).rejects.toMatchObject({
+      name: 'ServerError',
+      serverCode: 'UNLOCK_PASSWORD_REJECTED',
+    });
+  });
+
+  it('other requests keep the native default timeout', async () => {
+    const { client } = makeClient();
+    route({
+      isLocked: false,
+      batteryPercent: null,
+      serviceVersion: '0.1.0',
+      environment: 'Development',
+      lockAvailable: true,
+      proximity: 'UNKNOWN',
+      security: 'PAIRED',
+    });
+
+    await client.getStatus();
+
+    for (const [opts] of pinnedRequestMock.mock.calls) {
+      expect(opts.timeoutSeconds).toBeUndefined();
+    }
+  });
 });

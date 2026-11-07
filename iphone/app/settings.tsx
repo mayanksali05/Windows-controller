@@ -46,7 +46,7 @@ export default function SettingsScreen() {
       <Section title="Security">
         <Row label="Transport" value="TLS, certificate pinned" />
         <Row label="Authentication" value="Face ID + Ed25519 challenge-response" />
-        <Row label="Unlock" value="Extension point (not implemented)" />
+        <Row label="Unlock" value="Face ID + Windows password (lock-screen provider)" />
       </Section>
 
       <Section title="Network">

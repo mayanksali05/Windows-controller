@@ -37,7 +37,7 @@ modified.
 | `POST /api/v1/auth/challenge` | anon | `{ deviceId }` | `{ challengeId, challenge, expiresAt }` |
 | `POST /api/v1/auth/verify` | anon | `{ clientDeviceId, challengeId, timestamp, signature }` | `{ sessionToken, sessionExpires, proximity }` |
 | `GET /api/v1/proximity` | Bearer | — | `{ state, deviceId?, rssi?, updatedAt }` |
-| `POST /api/v1/unlock` | — | — | **does not exist (must 404)** |
+| `POST /api/v1/unlock` | Bearer | `{ deviceId, password }` | — (message `"Laptop unlocked"`; errors `UNLOCK_*`) |
 
 ### 1.3 Cryptography (must be byte-for-byte identical)
 
@@ -176,7 +176,8 @@ iphone/                      # coexists with the preserved Swift iphone/WinLock
   requires the OS chain.
 - Face ID before signing the challenge, and an explicit Face ID gate before
   **lock**, **pairing confirmation**, and **unpair**.
-- BLE proximity never authenticates. No Windows-auth bypass; no `/unlock`.
+- BLE proximity never authenticates. No Windows-auth bypass: `/unlock` hands the
+  user's real password to Windows via the credential provider.
 - Auto-lock remains Windows-side (`AutomaticLockMonitor`); the app only reads
   `/settings`.
 

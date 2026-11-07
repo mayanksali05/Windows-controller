@@ -8,6 +8,8 @@ export interface PinnedRequestOptions {
   body?: string;
   pin: string;
   mode: 'development' | 'production';
+  /** Request timeout in seconds (native default 10). */
+  timeoutSeconds?: number;
 }
 
 export interface PinnedResponse {

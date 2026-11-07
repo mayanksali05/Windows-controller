@@ -111,5 +111,12 @@ Private keys and pairing secrets are never stored in configuration.
 
 ## 7. Windows Unlock
 
-Not yet implemented (see `architecture.md` §8). Unlock remains an extension
-point; no bypass is shipped.
+1. Install Visual Studio 2022 with **Desktop development with C++**.
+2. `.\scripts\build-credential-provider.ps1`
+3. Elevated PowerShell: `.\scripts\install-credential-provider.ps1`
+4. In the iPhone app, open the laptop → **Unlock password → Set password**
+   (Windows account password, not PIN).
+5. Lock with Win+L, tap **Unlock** on the iPhone.
+
+Disable with `-Disable`, remove with `-Uninstall`. Design, limitations, and
+recovery steps: `docs/windows-unlock.md`.

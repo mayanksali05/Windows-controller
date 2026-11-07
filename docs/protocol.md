@@ -220,6 +220,31 @@ Response:
 `LockWorkStation` is invoked; session lock is confirmed by the OS. Any failure
 returns a structured error (e.g. `LOCK_FAILED`).
 
+### POST /unlock
+
+Unlocks the locked session with the user's **real Windows password**, which
+the phone keeps in the Keychain and releases only after Face ID. The service
+hands it to the WinLock credential provider on the lock screen, and Windows
+validates it (see `windows-unlock.md`). Rate limited to 5 requests per minute.
+
+```json
+{ "deviceId": "<iphone-device-id>", "password": "<windows account password>" }
+```
+
+Success: `{ "success": true, "message": "Laptop unlocked" }`. Failures:
+
+| HTTP | Code | Meaning |
+|------|------|---------|
+| 409 | `UNLOCK_NOT_LOCKED` | The session is not locked |
+| 422 | `UNLOCK_PASSWORD_REJECTED` | Windows rejected the password (message says why: wrong, locked out, expired) |
+| 503 | `UNLOCK_UNAVAILABLE` | Credential provider not installed, or the lock screen is not ready |
+| 429 | `RATE_LIMITED` | Too many attempts, or one already in progress |
+| 500 | `UNLOCK_FAILED` | Timed out, wrong user locked, or pipe endpoint failed verification |
+
+The client allows ~35 s for this request because the server waits for Windows
+to report the logon result. `GET /status` reports `unlockAvailable` when the
+provider is installed and enabled.
+
 ### GET /proximity
 
 ```json
@@ -314,6 +339,10 @@ sessions immediately because each request re-checks authorization.
 | `PAIRING_INVALID` | Pairing token/signature invalid |
 | `PAIRING_EXPIRED` | One-time pairing token expired |
 | `LOCK_FAILED` | OS lock call failed |
+| `UNLOCK_FAILED` | Unlock did not complete (timeout, wrong user, unverifiable endpoint) |
+| `UNLOCK_NOT_LOCKED` | Unlock requested while the session is not locked |
+| `UNLOCK_UNAVAILABLE` | Credential provider not installed / lock screen not ready |
+| `UNLOCK_PASSWORD_REJECTED` | Windows rejected the password |
 | `RATE_LIMITED` | Too many requests |
 | `MALFORMED_REQUEST` | Bad JSON/size/format |
 | `INTERNAL_ERROR` | Unexpected failure (generic message only) |

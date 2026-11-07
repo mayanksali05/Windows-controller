@@ -15,6 +15,10 @@ public static class ErrorCodes
     public const string PairingInvalid = "PAIRING_INVALID";
     public const string PairingExpired = "PAIRING_EXPIRED";
     public const string LockFailed = "LOCK_FAILED";
+    public const string UnlockFailed = "UNLOCK_FAILED";
+    public const string UnlockNotLocked = "UNLOCK_NOT_LOCKED";
+    public const string UnlockUnavailable = "UNLOCK_UNAVAILABLE";
+    public const string UnlockPasswordRejected = "UNLOCK_PASSWORD_REJECTED";
     public const string RateLimited = "RATE_LIMITED";
     public const string MalformedRequest = "MALFORMED_REQUEST";
     public const string InternalError = "INTERNAL_ERROR";

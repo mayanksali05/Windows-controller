@@ -12,6 +12,9 @@ export const SECURE_KEYS = {
   tlsPin(deviceId: string): string {
     return `winlock.laptop.${deviceId}.tlsPin`;
   },
+  unlockPassword(deviceId: string): string {
+    return `winlock.laptop.${deviceId}.unlockPassword`;
+  },
 } as const;
 
 const PREFIX = 'winlock.web.secure.';
@@ -20,6 +23,10 @@ export async function secureSet(key: string, value: string): Promise<void> {
   // eslint-disable-next-line no-console
   console.warn(`[web preview] secureSet('${key}') uses localStorage — NOT secure. iOS uses the Keychain.`);
   localStorage.setItem(PREFIX + key, value);
+}
+
+export async function secureSetSensitive(key: string, value: string): Promise<void> {
+  await secureSet(key, value);
 }
 
 export async function secureGet(key: string): Promise<string | null> {

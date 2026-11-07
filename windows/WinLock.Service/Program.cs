@@ -16,6 +16,8 @@ using WinLock.Service.Locking;
 using WinLock.Service.Pairing;
 using WinLock.Service.Security;
 using WinLock.Service.Status;
+using WinLock.Service.Unlocking;
+using WinLock.Service.Api;
 
 namespace WinLock.Service;
 
@@ -81,6 +83,7 @@ public partial class Program
         builder.Services.AddSingleton<IWindowsLockService, WindowsLockService>();
         builder.Services.AddSingleton<LockCoordinator>();
         builder.Services.AddSingleton<ISystemStatusService, WindowsSystemStatusService>();
+        builder.Services.AddSingleton<IWindowsAuthenticationProvider, CredentialProviderUnlockService>();
 
         builder.Services.AddSingleton<IBluetoothProximityScanner>(_ => new WindowsBluetoothProximityScanner(
             TimeSpan.FromSeconds(securityOptions.ProximityAwayTimeoutSeconds),
@@ -105,12 +108,22 @@ public partial class Program
                 limit.Window = TimeSpan.FromSeconds(serverOptions.RateLimitWindowSeconds);
                 limit.QueueLimit = 0;
             });
+            // Unlock submits a real Windows password: keep attempts scarce so a
+            // stolen session token cannot be used to drive account lockout.
+            options.AddFixedWindowLimiter(UnlockController.RateLimitPolicy, limit =>
+            {
+                limit.PermitLimit = 5;
+                limit.Window = TimeSpan.FromMinutes(1);
+                limit.QueueLimit = 0;
+            });
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, _) =>
             {
                 context.HttpContext.Response.ContentType = "application/json";
+                // camelCase like every other response (the iPhone client parses `success`).
                 var body = JsonSerializer.Serialize(
-                    ApiResponse.Failure(ErrorCodes.RateLimited, "Too many requests"));
+                    ApiResponse.Failure(ErrorCodes.RateLimited, "Too many requests"),
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web));
                 await context.HttpContext.Response.WriteAsync(body);
             };
         });

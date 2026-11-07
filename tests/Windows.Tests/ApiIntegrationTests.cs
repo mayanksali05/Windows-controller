@@ -8,7 +8,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using WinLock.Protocol.Models;
+using WinLock.Protocol;
 using WinLock.Service;
+using WinLock.Service.Authentication;
 using WinLock.Service.Bluetooth;
 using WinLock.Service.Locking;
 using Xunit;
@@ -41,6 +43,27 @@ public sealed class FakeProximityScanner : IBluetoothProximityScanner
 }
 
 /// <summary>
+/// Stands in for the credential-provider unlock path: records what it was
+/// asked to do and returns a configurable outcome.
+/// </summary>
+public sealed class FakeUnlockProvider : IWindowsAuthenticationProvider
+{
+    public bool IsAvailable => true;
+    public UnlockResult NextResult { get; set; } = new(UnlockOutcome.Unlocked, "Laptop unlocked");
+    public string? LastPassword { get; private set; }
+    public string? LastDeviceId { get; private set; }
+    public int Calls { get; private set; }
+
+    public Task<UnlockResult> UnlockAsync(UnlockRequest request, CancellationToken cancellationToken)
+    {
+        Calls++;
+        LastPassword = request.Password;
+        LastDeviceId = request.DeviceId;
+        return Task.FromResult(NextResult);
+    }
+}
+
+/// <summary>
 /// Hosts the real WinLock service over an in-memory test server with the lock
 /// service and BLE scanner replaced by fakes (so tests never lock the
 /// workstation or start a real Bluetooth watcher).
@@ -64,6 +87,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         {
             services.AddSingleton<IWindowsLockService, FakeLockService>();
             services.AddSingleton<IBluetoothProximityScanner, FakeProximityScanner>();
+            services.AddSingleton<FakeUnlockProvider>();
+            services.AddSingleton<IWindowsAuthenticationProvider>(sp => sp.GetRequiredService<FakeUnlockProvider>());
         });
     }
 }
@@ -71,10 +96,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
 {
     private readonly HttpClient _client;
+    private readonly FakeUnlockProvider _unlock;
 
     public ApiIntegrationTests(ApiFactory factory)
     {
         _client = factory.CreateClient();
+        _unlock = factory.Services.GetRequiredService<FakeUnlockProvider>();
     }
 
     private void SetBearer(string token) =>
@@ -199,12 +226,60 @@ public sealed class ApiIntegrationTests : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // The unlock rate limit is 5 per minute for the whole host, and this
+    // class shares one host, so keep the number of /unlock calls below that.
+
     [Fact]
-    public async Task Unlock_Endpoint_DoesNotExist()
+    public async Task Unauthenticated_Unlock_Returns401_AndNeverReachesProvider()
     {
-        // The unlock capability is a documented extension point; there must be
-        // no /unlock route (a fabricated endpoint would be an auth bypass).
-        var response = await _client.PostAsJsonAsync("/api/v1/unlock", new { device_id = "x" });
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var calls = _unlock.Calls;
+        var response = await _client.PostAsJsonAsync("/api/v1/unlock",
+            new UnlockRequestDto { DeviceId = "x", Password = "secret" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(calls, _unlock.Calls);
+    }
+
+    [Fact]
+    public async Task Unlock_ForwardsPasswordToProvider_AndReturnsSuccess()
+    {
+        SetBearer(await AuthenticateLaptopAsync());
+        _unlock.NextResult = new UnlockResult(UnlockOutcome.Unlocked, "Laptop unlocked");
+
+        var response = await _client.PostAsJsonAsync("/api/v1/unlock",
+            new UnlockRequestDto { DeviceId = "phone", Password = "correct horse" });
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>();
+        Assert.True(body!.Success);
+        Assert.Equal("Laptop unlocked", body.Message);
+        Assert.Equal("correct horse", _unlock.LastPassword);
+        // The audited device id is the authenticated one, not the body field.
+        Assert.Equal(TestLaptop.Device.DeviceId, _unlock.LastDeviceId);
+    }
+
+    [Fact]
+    public async Task Unlock_WithoutPassword_ReturnsBadRequest()
+    {
+        SetBearer(await AuthenticateLaptopAsync());
+        var response = await _client.PostAsJsonAsync("/api/v1/unlock", new UnlockRequestDto { DeviceId = "phone" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Unlock_RejectedPassword_ReturnsStructuredError()
+    {
+        SetBearer(await AuthenticateLaptopAsync());
+        _unlock.NextResult = new UnlockResult(UnlockOutcome.PasswordRejected, "Windows rejected the password.");
+
+        var response = await _client.PostAsJsonAsync("/api/v1/unlock",
+            new UnlockRequestDto { Password = "wrong" });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>();
+        Assert.False(body!.Success);
+        Assert.Equal(ErrorCodes.UnlockPasswordRejected, body.Error!.Code);
+        _unlock.NextResult = new UnlockResult(UnlockOutcome.Unlocked, "Laptop unlocked");
     }
 }

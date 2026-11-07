@@ -64,7 +64,11 @@ app.json  eas.json  package.json  tsconfig.json  jest.config.js
 - Face ID (`expo-local-authentication`) gates lock, pairing confirmation, and
   unpairing, plus the challenge signing inside authentication.
 - BLE is a proximity signal only and never authenticates.
-- Windows unlock is an extension point and is **not** implemented.
+- **No Mac?** Build on GitHub Actions and install from Windows with Sideloadly:
+  see `docs/iphone-install-windows.md`.
+- Unlock sends your Windows password, which is saved per laptop in the Keychain
+  (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`) and used only after Face ID. The laptop
+  needs the WinLock credential provider (see `docs/windows-unlock.md`).
 
 ## Required permissions (app.json)
 

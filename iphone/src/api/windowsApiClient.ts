@@ -37,7 +37,11 @@ interface SendOptions {
   body?: Record<string, unknown>;
   authenticated: boolean;
   retried?: boolean;
+  timeoutSeconds?: number;
 }
+
+/** Unlock waits for the Windows lock screen (server allows up to ~20s). */
+const UNLOCK_TIMEOUT_SECONDS = 35;
 
 /**
  * Typed client for the WinLock service. All requests go through the pinned
@@ -76,6 +80,24 @@ export class WindowsApiClient {
       method: 'POST',
       body: { deviceId: this.options.deviceId },
       authenticated: true,
+    });
+    this.requireSuccess(response);
+  }
+
+  /**
+   * Unlocks the locked Windows session with the user's real Windows password.
+   * The password travels only inside the pinned TLS session and is never
+   * logged; Windows validates it exactly as if it had been typed.
+   */
+  async unlock(password: string): Promise<void> {
+    if (!password) {
+      throw new Error('A password is required to unlock');
+    }
+    const response = await this.send<undefined>('/api/v1/unlock', {
+      method: 'POST',
+      body: { deviceId: this.options.deviceId, password },
+      authenticated: true,
+      timeoutSeconds: UNLOCK_TIMEOUT_SECONDS,
     });
     this.requireSuccess(response);
   }
@@ -141,6 +163,19 @@ export class WindowsApiClient {
     this.sessionExpiresAt = null;
   }
 
+  /**
+   * Makes sure a valid session exists, authenticating (with Face ID) only if
+   * needed. Returns true when Face ID was just used, so callers can skip a
+   * second prompt for the same action.
+   */
+  async ensureSession(): Promise<boolean> {
+    if (this.hasValidSession()) {
+      return false;
+    }
+    await this.authenticate();
+    return true;
+  }
+
   /** Face-ID-gated challenge-response authentication (public entry point). */
   async authenticate(): Promise<void> {
     await this.options.requireFaceId();
@@ -189,6 +224,7 @@ export class WindowsApiClient {
         body: opts.body ? JSON.stringify(opts.body) : undefined,
         pin: this.options.pin,
         mode: this.options.mode,
+        ...(opts.timeoutSeconds ? { timeoutSeconds: opts.timeoutSeconds } : {}),
       });
     } catch (error) {
       throw mapNativeError(error);

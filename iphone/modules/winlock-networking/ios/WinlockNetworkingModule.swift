@@ -111,7 +111,10 @@ public class WinlockNetworkingModule: Module {
 
     var request = URLRequest(url: url)
     request.httpMethod = method
-    request.timeoutInterval = 10
+    // Default 10s; unlock passes a longer timeout because it waits for the
+    // Windows lock screen to accept the credential.
+    let timeout = (options["timeoutSeconds"] as? Double) ?? 10
+    request.timeoutInterval = min(max(timeout, 1), 60)
     for (key, value) in headers {
       request.setValue(value, forHTTPHeaderField: key)
     }

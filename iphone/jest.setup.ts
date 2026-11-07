@@ -13,6 +13,7 @@ jest.mock('expo-secure-store', () => {
       store.delete(key);
     }),
     AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'afterFirstUnlockThisDeviceOnly',
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'whenUnlockedThisDeviceOnly',
   };
 });
 

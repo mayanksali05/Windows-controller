@@ -19,6 +19,9 @@ public sealed class StatusDto
     /// <summary>True when the running context can call LockWorkStation.</summary>
     public bool LockAvailable { get; init; }
 
+    /// <summary>True when the WinLock credential provider is installed and enabled, so <c>POST /unlock</c> can work.</summary>
+    public bool UnlockAvailable { get; init; }
+
     /// <summary>One of UNKNOWN | NEARBY | AWAY | AUTHENTICATED (see protocol docs).</summary>
     public string Proximity { get; init; } = "UNKNOWN";
 

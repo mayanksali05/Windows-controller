@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PairedLaptop } from '../types/protocol';
-import { secureGet, secureSet, secureDelete, SECURE_KEYS } from './secureStore';
+import { secureGet, secureSet, secureSetSensitive, secureDelete, SECURE_KEYS } from './secureStore';
 
 /**
  * Non-secret paired-laptop metadata (device id, host, port, name). Keys and
@@ -43,6 +43,7 @@ export async function removeLaptop(deviceId: string): Promise<void> {
   await persist(next);
   await secureDelete(SECURE_KEYS.windowsPublicKey(deviceId));
   await secureDelete(SECURE_KEYS.tlsPin(deviceId));
+  await secureDelete(SECURE_KEYS.unlockPassword(deviceId));
 }
 
 export async function findLaptop(deviceId: string): Promise<PairedLaptop | null> {
@@ -67,4 +68,23 @@ export async function getWindowsPublicKey(deviceId: string): Promise<string | nu
 
 export async function getTlsPin(deviceId: string): Promise<string | null> {
   return secureGet(SECURE_KEYS.tlsPin(deviceId));
+}
+/**
+ * The user's Windows account password for unlocking this laptop. Kept only in
+ * the Keychain (this device, while unlocked); never in AsyncStorage or logs.
+ */
+export async function setUnlockPassword(deviceId: string, password: string): Promise<void> {
+  await secureSetSensitive(SECURE_KEYS.unlockPassword(deviceId), password);
+}
+
+export async function getUnlockPassword(deviceId: string): Promise<string | null> {
+  return secureGet(SECURE_KEYS.unlockPassword(deviceId));
+}
+
+export async function hasUnlockPassword(deviceId: string): Promise<boolean> {
+  return (await getUnlockPassword(deviceId)) !== null;
+}
+
+export async function clearUnlockPassword(deviceId: string): Promise<void> {
+  await secureDelete(SECURE_KEYS.unlockPassword(deviceId));
 }

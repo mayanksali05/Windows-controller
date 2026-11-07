@@ -16,10 +16,9 @@ iPhones) interact with a Windows laptop over the local network:
 3. **Cryptographic, Face-ID-backed authentication** of the iPhone.
 4. **Optional automatic locking** when the iPhone leaves proximity.
 
-Windows session **unlocking** is deliberately *not* implemented via any bypass.
-It is represented by the `IWindowsAuthenticationProvider` abstraction and, until
-a supported integration exists (Credential Provider / Windows Hello / FIDO2), it
-remains a documented extension point. See `security.md`.
+5. **Remote unlock** through a Windows Credential Provider that submits the
+   user's real Windows password (kept on the iPhone, released by Face ID).
+   Windows validates it; nothing is bypassed. See `windows-unlock.md`.
 
 ## 2. Components
 
@@ -96,6 +95,7 @@ in `iphone/WinLock/` for comparison). It provides:
 | POST   | `/lock`          | Yes           | Lock workstation                     |
 | GET    | `/proximity`     | Yes           | Current proximity state               |
 | GET    | `/settings`      | Yes           | Read proximity/auto-lock policy       |
+| POST   | `/unlock`        | Yes           | Unlock with the user's Windows password (via credential provider) |
 
 `*` Pairing/auth endpoints are unauthenticated by design (no key yet). The
 one-time pairing token is **never** exposed to unauthenticated clients — it is
@@ -221,26 +221,16 @@ Boundaries and invariants:
   challenges + replay protection + rate limiting + request size limits. Same-Wi-Fi
   presence alone grants nothing.
 
-## 8. Windows Unlock (extension point)
+## 8. Windows Unlock
 
-Research concluded (see `docs/windows-unlock.md`): unlocking a locked Windows
-session is only possible through the OS credential stack (Winlogon). The
-supported options are:
-
-- **Windows Credential Provider** (C++ COM, admin install): the only supported
-  logon integration point, but credential providers are *not* enforcement
-  mechanisms — the LSA validates credentials, so the user's real Windows Hello
-  gesture, PIN, or password is still required on the laptop. An iPhone could at
-  most trigger such a flow, never replace the credential.
-- **FIDO2 / WebAuthn passkeys**: an iPhone could be a FIDO2 authenticator only
-  if enrolled as a Windows Hello security key for the account — a deep,
-  user-interactive OS enrollment outside the scope of a companion service.
-
-Neither is implementable as a safe companion-service feature today. The codebase
-exposes `IWindowsAuthenticationProvider` as a clean boundary with **no
-implementation** and **no `/unlock` endpoint**; the feature remains a documented
-extension point. No keyboard-injection, credential-fabrication, or
-Winlogon-bypass approach is shipped.
+Implemented with a Windows **Credential Provider**
+(`windows/WinLock.CredentialProvider`, C++ COM, admin install). The flow:
+iPhone (Face ID, Keychain password) → `POST /api/v1/unlock` → `WinLock.Service`
+→ named pipe (owner must be SYSTEM) → provider in LogonUI → standard unlock
+logon → Windows validates. Credential providers are not enforcement
+mechanisms: LSA checks the real password, so a wrong password simply fails.
+No keyboard injection, credential fabrication, or Winlogon bypass is used.
+Full design, setup, and recovery: `docs/windows-unlock.md`.
 
 ## 9. Repository Layout
 
@@ -248,6 +238,7 @@ Winlogon-bypass approach is shipped.
 /iphone                  iOS client (Expo / React Native; legacy SwiftUI in iphone/WinLock)
 /windows/WinLock.Service Windows background service
 /windows/WinLock.Tray    Tray/status application
+/windows/WinLock.CredentialProvider  Lock-screen credential provider (C++) for unlock
 /tests/Windows.Tests     .NET unit tests (security-critical paths)
 /tests/Protocol.Tests    Cross-cutting protocol tests
 /docs                    architecture, security, protocol, setup, threat model, windows-unlock
@@ -266,3 +257,4 @@ Winlogon-bypass approach is shipped.
 | 6 | BLE proximity |
 | 7 | Automatic lock |
 | 8 | Windows unlock research / extension point |
+| 9 | Remote unlock via credential provider |

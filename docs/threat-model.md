@@ -53,7 +53,8 @@ Each entry records attack, impact, mitigation, and residual risk.
 - **Mitigation:** Face ID gate on signing, Keychain accessible only after first
   unlock, user can unpair the device from the laptop.
 - **Residual risk:** Medium for lock (intended feature); Low for anything else.
-  Unlock remains unsupported.
+  Unlock additionally needs the saved Windows password, which is released only
+  after Face ID/passcode (see T11).
 
 ## T5. Attacker obtains the laptop
 
@@ -116,13 +117,30 @@ Each entry records attack, impact, mitigation, and residual risk.
 - **Attack:** exploits this system to unlock the Windows session without
   credentials.
 - **Impact:** would be a critical auth bypass.
-- **Mitigation:** the system has **no** unlock path and no credential handling.
-  `IWindowsAuthenticationProvider` is an abstraction with no implementation and
-  no `/unlock` endpoint. Research (`docs/windows-unlock.md`) shows the only
-  supported unlock integrations (Credential Provider, Hello/FIDO2 enrollment)
-  keep Winlogon in control and still require the user's real credentials.
-- **Residual risk:** None introduced by this design. Explicitly documented
-  non-goal; any future unlock integration must go through the supported OS path.
+- **Mitigation:** unlock goes through a Windows Credential Provider and needs
+  the user's **real Windows password**. LSA validates it like a typed password,
+  and lockout policy applies. `/unlock` requires a paired phone, Face ID, a
+  signed-challenge session, and is rate limited (5/min). The provider accepts
+  requests only from the locked user's own processes. The service sends the
+  password only to a pipe owned by SYSTEM. See `docs/windows-unlock.md`.
+- **Residual risk:** Low. No credential-free path exists; see T11 for the stored
+  password.
+
+## T11. Attacker targets the stored Windows password
+
+- **Attack:** extracts the unlock password from the iPhone, the network, the
+  service, or the pipe between service and lock screen.
+- **Impact:** knowledge of the user's Windows password.
+- **Mitigation:** stored only in the iPhone Keychain
+  (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`) and used only after Face ID. Sent only
+  inside pinned TLS with a valid session. Never stored or logged on the laptop.
+  The service checks that the pipe owner is SYSTEM before writing, so a
+  squatting process cannot capture it. Buffers are zeroed after use.
+- **Residual risk:** Medium. A thief with the unlocked phone **and** the user's
+  Face ID or passcode can unlock the laptop; that is the feature's purpose. A
+  fully compromised laptop session (T5) can read the password from process
+  memory during an unlock. Mitigate by removing the password in the app or
+  unpairing the phone if it is lost.
 
 ---
 

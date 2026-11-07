@@ -11,7 +11,8 @@
   scanner identify *which* phone is present, but the signal grants nothing:
   privileged operations always require Face ID + the signed challenge-response
   over Wi-Fi.
-- The system never handles, transmits, or stores Windows credentials.
+- The laptop never stores Windows credentials. For unlock, the iPhone sends the
+  user's own password, which Windows validates (see §9).
 - No mechanism bypasses, disables, or circumvents Windows authentication.
 
 ## 2. Keys and Storage
@@ -30,6 +31,8 @@
   `expo-secure-store` (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`),
   never AsyncStorage or plaintext files.
 - Windows public key + TLS pin stored in the Keychain via `expo-secure-store`.
+- The optional Windows unlock password (per laptop) is stored with
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY` and used only after Face ID.
 - Non-secret laptop metadata (host, port, name) lives in AsyncStorage.
 
 ## 3. Transport Security (TLS)
@@ -72,7 +75,7 @@ See `protocol.md` for messages. Security-relevant properties:
 
 ## 5. Privileged Operations
 
-`/lock`, `/status`, `/proximity`, `/unpair` require a valid session token
+`/lock`, `/unlock`, `/status`, `/proximity`, `/unpair` require a valid session token
 produced by `/auth/verify`. Requests without a valid token are rejected with a
 structured error; no privileged endpoint has an unauthenticated path.
 
@@ -101,19 +104,18 @@ cryptographic secrets. See `Logging` in the Windows service.
 
 ## 9. Windows Unlock
 
-Unlocking a locked session requires OS-supported integration. Research
-(`docs/windows-unlock.md`) found that:
+Unlock uses a **Credential Provider**, the supported lock-screen integration.
+It submits the user's **real Windows password**, and Windows validates it.
+Properties (details in `windows-unlock.md`):
 
-- A **Credential Provider** is the only supported logon integration point, but
-  it is not an enforcement mechanism — the user's real Windows Hello gesture,
-  PIN, or password is still required on the laptop.
-- **Windows Hello / FIDO2 / passkeys** only apply through OS-managed enrollment
-  (e.g., the iPhone enrolled as a Windows Hello security key).
-
-Neither is implementable as a safe companion-service feature today. The codebase
-exposes `IWindowsAuthenticationProvider` as a documented extension point with no
-implementation and no `/unlock` endpoint. No keyboard-injection or
-Winlogon-bypass approach is shipped.
+- The password is stored only on the iPhone (Keychain,
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`) and read only after Face ID.
+- It is sent only over pinned TLS with a valid session. `/unlock` is limited to
+  5 requests per minute.
+- The service never stores or logs it. It writes it only to a pipe owned by
+  SYSTEM and zeroes its buffer.
+- The provider accepts requests only from the locked user's processes, works
+  only on the lock screen, and leaves Windows' own sign-in options untouched.
 
 ## 10. Residual Risks (summary)
 

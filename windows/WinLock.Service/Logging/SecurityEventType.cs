@@ -12,6 +12,9 @@ public enum SecurityEventType
     LockRequested,
     LockSuccess,
     LockFailed,
+    UnlockRequested,
+    UnlockSuccess,
+    UnlockFailed,
     ProximityChanged,
     DeviceUnpaired,
 }

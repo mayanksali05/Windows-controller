@@ -17,10 +17,24 @@ export const SECURE_KEYS = {
   tlsPin(deviceId: string): string {
     return `winlock.laptop.${deviceId}.tlsPin`;
   },
+  unlockPassword(deviceId: string): string {
+    return `winlock.laptop.${deviceId}.unlockPassword`;
+  },
 } as const;
 
 export async function secureSet(key: string, value: string): Promise<void> {
   await SecureStore.setItemAsync(key, value, { keychainAccessible: ACCESSIBLE });
+}
+
+/**
+ * Stricter storage for the Windows unlock password: readable only while the
+ * iPhone itself is unlocked, never backed up, never migrated to a new device.
+ * The app additionally requires Face ID before it uses the value.
+ */
+export async function secureSetSensitive(key: string, value: string): Promise<void> {
+  await SecureStore.setItemAsync(key, value, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
 }
 
 export async function secureGet(key: string): Promise<string | null> {

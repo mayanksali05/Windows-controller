@@ -12,6 +12,10 @@ export const ErrorCodes = {
   PAIRING_INVALID: 'PAIRING_INVALID',
   PAIRING_EXPIRED: 'PAIRING_EXPIRED',
   LOCK_FAILED: 'LOCK_FAILED',
+  UNLOCK_FAILED: 'UNLOCK_FAILED',
+  UNLOCK_NOT_LOCKED: 'UNLOCK_NOT_LOCKED',
+  UNLOCK_UNAVAILABLE: 'UNLOCK_UNAVAILABLE',
+  UNLOCK_PASSWORD_REJECTED: 'UNLOCK_PASSWORD_REJECTED',
   RATE_LIMITED: 'RATE_LIMITED',
   MALFORMED_REQUEST: 'MALFORMED_REQUEST',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
@@ -42,6 +46,8 @@ export interface StatusDto {
   serviceVersion: string;
   environment: string;
   lockAvailable: boolean;
+  /** True when the laptop's WinLock credential provider is installed (older services omit it). */
+  unlockAvailable?: boolean;
   proximity: ProximityStateString;
   security: SecurityStateString;
 }
