@@ -114,8 +114,9 @@ Properties (details in `windows-unlock.md`):
   5 requests per minute.
 - The service never stores or logs it. It writes it only to a pipe owned by
   SYSTEM and zeroes its buffer.
-- The provider accepts requests only from the locked user's processes, works
-  only on the lock screen, and leaves Windows' own sign-in options untouched.
+- The provider accepts requests only from the locked user's processes, is
+  inactive in UAC/CredUI and password-change prompts, and leaves Windows' own
+  sign-in options untouched.
 
 ## 10. Residual Risks (summary)
 

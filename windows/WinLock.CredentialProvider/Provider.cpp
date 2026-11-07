@@ -92,9 +92,15 @@ IFACEMETHODIMP WinLockProvider::SetUsageScenario(CREDENTIAL_PROVIDER_USAGE_SCENA
 {
     WinLockLog(L"Provider::SetUsageScenario cpus=%d flags=0x%X (unlock=%d)", static_cast<int>(scenario), flags,
         static_cast<int>(CPUS_UNLOCK_WORKSTATION));
-    // Unlock only. Initial sign-in, CredUI prompts, and password changes are
-    // left entirely to Windows' own providers.
-    if (scenario != CPUS_UNLOCK_WORKSTATION)
+    // Since Windows 10, LogonUI usually reports unlocking a locked session as
+    // CPUS_LOGON (the two scenarios were merged); CPUS_UNLOCK_WORKSTATION is
+    // still used under some policies. Support both. CredUI prompts and
+    // password changes are left entirely to Windows' own providers.
+    //
+    // At a boot-time sign-in screen the tile appears too, but it can do
+    // nothing there: requests are accepted only from the target user's own
+    // processes (the WinLock service runs inside that user's session).
+    if (scenario != CPUS_LOGON && scenario != CPUS_UNLOCK_WORKSTATION)
     {
         return E_NOTIMPL;
     }

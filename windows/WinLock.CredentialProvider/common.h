@@ -1,7 +1,9 @@
 // WinLock credential provider — shared definitions.
 //
 // This DLL is loaded by LogonUI (as SYSTEM) on the lock screen. It adds a
-// "Unlock with iPhone" sign-in option for the locked user. The WinLock
+// "Unlock with iPhone" sign-in option for the locked user (scenarios
+// CPUS_LOGON and CPUS_UNLOCK_WORKSTATION; Windows 10+ uses CPUS_LOGON for
+// most unlocks). The WinLock
 // service forwards the user's real Windows password (kept on the iPhone,
 // released by Face ID) through a local named pipe; this provider packs it into
 // a standard KERB_INTERACTIVE_UNLOCK_LOGON and hands it to Windows, which

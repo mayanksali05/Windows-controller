@@ -40,7 +40,8 @@ POST /api/v1/unlock ──TLS (pinned) + session token──▶ WinLock.Service 
    the provider's named pipe. **It refuses to send anything unless the pipe's
    owner is SYSTEM**, so an ordinary program cannot create a fake pipe to
    capture the password.
-4. The credential provider, running in LogonUI, checks that the connecting
+4. The credential provider, running in LogonUI (Windows labels the scenario
+   `CPUS_LOGON` on Windows 10+, `CPUS_UNLOCK_WORKSTATION` under some policies), checks that the connecting
    process belongs to **the locked user**. It then marks that user's "Unlock
    with iPhone" sign-in option as the default with auto-submit and asks
    LogonUI to refresh.
@@ -69,9 +70,12 @@ The WinLock option is an extra choice under your user tile.
   (Face ID + signed challenge), at most **5 attempts per minute**. On the
   laptop side, only the locked user's own processes (or SYSTEM) can talk to
   the provider.
-- **Where unlock works:** only on the lock screen (`CPUS_UNLOCK_WORKSTATION`).
-  The provider does nothing at boot sign-in, in UAC/CredUI prompts, or on
-  password-change screens.
+- **Where unlock works:** on the lock screen. Since Windows 10, Windows reports
+  most unlocks as `CPUS_LOGON` (sign-in and unlock were merged) and some as
+  `CPUS_UNLOCK_WORKSTATION`; the provider handles both. The option also shows
+  on a boot-time sign-in screen, but it cannot do anything there, because only
+  the user's own processes (the WinLock service in their session) can send it
+  a request. It is never used in UAC/CredUI prompts or password-change screens.
 - **Stolen-phone risk.** Someone with your unlocked phone **and** your Face ID
   or passcode can unlock the laptop. That is the purpose of the feature.
   Remove the password in the app or unpair the phone (tray → Paired devices)
