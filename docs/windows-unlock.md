@@ -81,23 +81,28 @@ The WinLock option is an extra choice under your user tile.
 
 On the laptop:
 
-1. Install **Visual Studio 2022** (Community is fine) with the **Desktop
-   development with C++** workload.
-2. Build: `.\scripts\build-credential-provider.ps1`
-3. Install from an **elevated** PowerShell:
-   `.\scripts\install-credential-provider.ps1`
+1. Get the DLL, either way:
+   - **No local install (recommended if C: is short on space):** on GitHub, go
+     to **Actions → Windows credential provider → Run workflow**, then download
+     the **WinLock-CredentialProvider** artifact and unzip it.
+   - **Local build:** Visual Studio (Community or Build Tools, 2019 or newer)
+     with **Desktop development with C++**, then
+     `.\scripts\build-credential-provider.ps1`.
+2. Install from an **elevated** PowerShell:
+   `.\scripts\install-credential-provider.ps1 -DllPath <path to the DLL>`
+   (leave out `-DllPath` after a local build).
    This copies the DLL to `C:\Windows\System32` and registers it under
    `HKLM\...\Authentication\Credential Providers\{B8C6F5E2-4A5D-4C1B-9E0F-3D2A7C8B9E41}`.
-4. Run the WinLock service **as yourself** in your session (for example
+3. Run the WinLock service **as yourself** in your session (for example
    `.\scripts\run-development.ps1`). It must keep running while the laptop is
    locked; it does.
 
 On the iPhone (WinLock app → your laptop):
 
-5. **Unlock password → Set password.** Enter your **Windows account password**,
+4. **Unlock password → Set password.** Enter your **Windows account password**,
    not your PIN. For a Microsoft account, this is your Microsoft account
    password.
-6. Lock the laptop (Win+L or the Lock button), then tap **Unlock**.
+5. Lock the laptop (Win+L or the Lock button), then tap **Unlock**.
 
 ## 4. Requirements and known limitations
 

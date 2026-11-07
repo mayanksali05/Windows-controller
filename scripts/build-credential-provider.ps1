@@ -3,7 +3,7 @@
 .SYNOPSIS
     Builds the WinLock credential provider DLL (needed for iPhone unlock).
 .DESCRIPTION
-    Requires Visual Studio 2022 (Community is fine) or Build Tools 2022 with the
+    Requires Visual Studio 2022/2026 (Community is fine) or Build Tools with the
     "Desktop development with C++" workload. Output:
     windows\WinLock.CredentialProvider\bin\Release\WinLock.CredentialProvider.dll
 #>
@@ -19,7 +19,7 @@ $project = Join-Path $root 'windows\WinLock.CredentialProvider\WinLock.Credentia
 
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 if (-not (Test-Path $vswhere)) {
-    throw 'Visual Studio 2022 was not found. Install it with the "Desktop development with C++" workload.'
+    throw 'Visual Studio was not found. Install it with the "Desktop development with C++" workload.'
 }
 
 $msbuild = & $vswhere -latest -products * `
