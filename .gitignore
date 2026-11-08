@@ -65,3 +65,7 @@ Desktop.ini
 # Local tooling
 .vscode/
 .idea/
+# Built/downloaded binaries (install from the GitHub Actions artifact instead)
+*.dll
+*.pdb
+*.ipa
