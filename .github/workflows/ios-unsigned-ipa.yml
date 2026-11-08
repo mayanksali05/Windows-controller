@@ -27,9 +27,9 @@ jobs:
         working-directory: iphone
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -51,7 +51,7 @@ jobs:
           WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
           SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           echo "Workspace: $WORKSPACE  Scheme: $SCHEME"
-          set -o pipefail
+          STATUS=0
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -62,7 +62,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build | tail -n 200
+            build > xcodebuild.log 2>&1 || STATUS=$?
+          tail -n 200 xcodebuild.log
+          if [ "$STATUS" -ne 0 ]; then
+            # Surface compiler errors as annotations (visible on the run page
+            # without signing in), then fail the step.
+            grep -E "(error|fatal error):" xcodebuild.log | sed -E 's/^.*\/(iphone\/)/\1/' | sort -u | head -n 20 |
+              while IFS= read -r line; do echo "::error::$line"; done || true
+            exit "$STATUS"
+          fi
 
       - name: Package .ipa
         run: |
@@ -72,6 +80,15 @@ jobs:
           cp -R "$APP" Payload/
           zip -qry WinLock-unsigned.ipa Payload
           ls -lh WinLock-unsigned.ipa
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: iphone/xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - uses: actions/upload-artifact@v4
         with:

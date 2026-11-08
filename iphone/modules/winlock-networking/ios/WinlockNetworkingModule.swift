@@ -80,7 +80,7 @@ public class WinlockNetworkingModule: Module {
   public func definition() -> ModuleDefinition {
     Name("WinlockNetworking")
 
-    AsyncFunction("pinnedRequest") { (options: [String: Any]) throws -> [String: Any] in
+    AsyncFunction("pinnedRequest") { (options: [String: Any]) async throws -> [String: Any] in
       try await self.pinnedRequest(options: options)
     }
 
@@ -147,7 +147,10 @@ public class WinlockNetworkingModule: Module {
 
   private func startDiscovery() {
     guard browser == nil else { return }
-    let browser = NWBrowser(for: .bonjour(type: "_mywinlock._tcp", domain: nil), using: .tcp)
+    // bonjourWithTXTRecord so results carry the laptop's TXT record (device_id).
+    let browser = NWBrowser(
+      for: .bonjourWithTXTRecord(type: "_mywinlock._tcp", domain: nil),
+      using: .tcp)
     browser.browseResultsChangedHandler = { [weak self] results, _ in
       self?.handle(results)
     }
@@ -164,8 +167,11 @@ public class WinlockNetworkingModule: Module {
 
   private func handle(_ results: Set<NWBrowser.Result>) {
     for result in results {
-      guard case .service(let name, _, _) = result.endpoint else { continue }
-      let deviceId = result.metadata?.bonjourTxtRecord?["device_id"] ?? ""
+      guard case .service(let name, _, _, _) = result.endpoint else { continue }
+      var deviceId = ""
+      if case .bonjour(let txt) = result.metadata {
+        deviceId = txt["device_id"] ?? ""
+      }
       resolve(result.endpoint, name: name, deviceId: deviceId)
     }
   }
@@ -174,14 +180,20 @@ public class WinlockNetworkingModule: Module {
     let key = "\(name)-\(deviceId)"
     guard resolvers[key] == nil else { return }
 
-    let connection = NWConnection(to: endpoint, using: .tcp)
+    // Resolve over IPv4: the laptop advertises an A record, and an IPv4
+    // literal can be used directly in the https:// URL.
+    let parameters = NWParameters.tcp
+    if let ip = parameters.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options {
+      ip.version = .v4
+    }
+    let connection = NWConnection(to: endpoint, using: parameters)
     resolvers[key] = connection
     connection.stateUpdateHandler = { [weak self] state in
       switch state {
       case .ready:
         if let remote = connection.currentPath?.remoteEndpoint {
           if case .hostPort(let host, let port) = remote {
-            self?.emitLaptop(name: name, deviceId: deviceId, host: host.debugDescription, port: Int(port.rawValue))
+            self?.emitLaptop(name: name, deviceId: deviceId, host: WinlockNetworkingModule.hostString(host), port: Int(port.rawValue))
           }
         }
         connection.cancel()
@@ -194,6 +206,20 @@ public class WinlockNetworkingModule: Module {
       }
     }
     connection.start(queue: discoveryQueue)
+  }
+
+  /// "192.168.1.20" for IPv4 (drops any "%en0" interface suffix).
+  private static func hostString(_ host: NWEndpoint.Host) -> String {
+    switch host {
+    case .ipv4(let address):
+      return "\(address)".components(separatedBy: "%").first ?? "\(address)"
+    case .ipv6(let address):
+      return "\(address)"
+    case .name(let name, _):
+      return name
+    @unknown default:
+      return host.debugDescription
+    }
   }
 
   private func emitLaptop(name: String, deviceId: String, host: String, port: Int) {

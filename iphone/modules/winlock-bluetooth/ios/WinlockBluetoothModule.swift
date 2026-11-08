@@ -2,15 +2,28 @@ import CoreBluetooth
 import ExpoModulesCore
 import Foundation
 
+/// CoreBluetooth delegates must be NSObject subclasses, and Expo's `Module`
+/// base class is not one, so the delegate lives in this small helper.
+private final class PeripheralDelegate: NSObject, CBPeripheralManagerDelegate {
+  var onPoweredOn: (() -> Void)?
+
+  func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+    if peripheral.state == .poweredOn {
+      onPoweredOn?()
+    }
+  }
+}
+
 /// Advertises the iPhone's per-device BLE service so the Windows laptop can
 /// estimate proximity. The service UUID is derived on the JS side (RFC 4122 v5
 /// of the device id) and passed in; this module only handles CoreBluetooth.
 /// BLE presence is a proximity signal only and never authorizes anything.
-public class WinlockBluetoothModule: Module, CBPeripheralManagerDelegate {
+public class WinlockBluetoothModule: Module {
   /// Fixed UUID for the characteristic that returns the device id to a
   /// connected Windows scanner.
   private static let identityCharacteristicUUID = CBUUID(string: "C0FFEE00-1111-4222-8333-444455556666")
 
+  private let peripheralDelegate = PeripheralDelegate()
   private var manager: CBPeripheralManager?
   private var serviceUUID: CBUUID?
   private var deviceId: String?
@@ -24,7 +37,11 @@ public class WinlockBluetoothModule: Module, CBPeripheralManagerDelegate {
       self.serviceUUID = CBUUID(string: serviceUuid)
       self.shouldAdvertise = true
       if self.manager == nil {
-        self.manager = CBPeripheralManager(delegate: self, queue: nil)
+        self.peripheralDelegate.onPoweredOn = { [weak self] in
+          self?.startAdvertisingNow()
+        }
+        // queue: nil -> delegate callbacks arrive on the main queue.
+        self.manager = CBPeripheralManager(delegate: self.peripheralDelegate, queue: nil)
       } else {
         self.startAdvertisingNow()
       }
@@ -36,13 +53,7 @@ public class WinlockBluetoothModule: Module, CBPeripheralManagerDelegate {
     }
 
     Function("getState") { () -> String in
-      self.stateString(self.manager?.state ?? .unknown)
-    }
-  }
-
-  public func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
-    if peripheral.state == .poweredOn {
-      startAdvertisingNow()
+      WinlockBluetoothModule.stateString(self.manager?.state ?? .unknown)
     }
   }
 
@@ -58,7 +69,7 @@ public class WinlockBluetoothModule: Module, CBPeripheralManagerDelegate {
     manager.removeAllServices()
 
     let identity = CBMutableCharacteristic(
-      type: Self.identityCharacteristicUUID,
+      type: WinlockBluetoothModule.identityCharacteristicUUID,
       properties: [.read],
       value: Data(deviceId.utf8),
       permissions: [.readable])
@@ -73,7 +84,7 @@ public class WinlockBluetoothModule: Module, CBPeripheralManagerDelegate {
     ])
   }
 
-  private func stateString(_ state: CBManagerState) -> String {
+  private static func stateString(_ state: CBManagerState) -> String {
     switch state {
     case .poweredOn: return "POWERED_ON"
     case .poweredOff: return "POWERED_OFF"
